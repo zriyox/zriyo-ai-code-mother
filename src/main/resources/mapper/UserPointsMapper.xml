@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zriyo.aicodemother.mapper.UserPointsMapper">
+
+    <update id="deductPoints">
+        UPDATE user_points
+        SET
+            available_points = available_points - #{fixedPoints},
+            used_points = used_points + #{fixedPoints},  -- 显式累加
+            version = version + 1                        -- 乐观锁递增
+        WHERE
+            user_id = #{userId}
+          AND available_points >= #{fixedPoints}       -- 余额校验
+          AND version = #{currentVersion};             -- 乐观锁校验
+    </update>
+
+    <update id="adjustPoints">
+        UPDATE user_points
+        SET
+        available_points = available_points + #{delta},
+
+        <!-- total_points 只在获得积分时累加（delta > 0） -->
+        total_points = total_points +
+        <choose>
+            <when test="delta > 0">#{delta}</when>
+            <otherwise>0</otherwise>
+        </choose>,
+
+        <!-- used_points 只在消耗积分时累加（delta < 0） -->
+        used_points = used_points +
+        <choose>
+            <when test="delta &lt; 0">#{absDelta}</when>
+            <otherwise>0</otherwise>
+        </choose>,
+
+        version = version + 1
+        WHERE
+        user_id = #{userId}
+        AND version = #{version}
+        <if test="delta &lt; 0">
+            AND available_points >= #{absDelta}
+        </if>
+    </update>
+</mapper>

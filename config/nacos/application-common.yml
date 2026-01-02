@@ -1,0 +1,30 @@
+spring:
+  # Redis 共享配置
+  data:
+    redis:
+      host: redis
+      port: 6379
+      database: 0
+      # password: ${redis_password}
+
+rocketmq:
+  # RocketMQ NameServer
+  name-server: 192.168.1.10:9876
+  producer:
+    group: ${spring.application.name}-group
+
+dubbo:
+  # Dubbo 注册到 Nacos
+  registry:
+    address: nacos://nacos:8848
+  # 协议配置
+  protocol:
+    name: dubbo
+    port: -1 # 自动分配端口
+  consumer:
+    check: false # 启动时不检查依赖服务是否可用
+
+# 日志格式优化
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight(%-5level) %magenta([%thread]) %cyan(%logger{50}) - %msg%n"

@@ -1,0 +1,19 @@
+# Apple Design Tokens (Compact)
+
+## 🎨 Palette & Surface
+- **BG**: `#F5F5F7` | **Surface**: `bg-white rounded-[24px] shadow-sm`
+- **Glass**: `bg-white/70 backdrop-blur-xl border border-white/20`
+- **Text**: Primary `#1D1D1F`, Secondary `#86868B`, Accent `#0071E3`
+
+## ✍️ Typo (Tailwind)
+- **H1**: `text-5xl font-semibold tracking-tight`
+- **H2**: `text-2xl font-medium tracking-tight`
+- **Body**: `text-[17px] leading-relaxed`
+
+## ⚡️ Interaction
+- **Button**: `bg-[#0071E3] text-white hover:bg-[#0077ED] rounded-full px-6 py-2.5 active:scale-95 transition-all`
+- **Input**: `bg-[#E8E8ED]/50 focus:bg-white rounded-2xl h-12 transition-all`
+
+## 🏗 Layout (Bento Grid)
+- **Container**: `grid grid-cols-1 md:grid-cols-3 gap-6 p-6 max-w-7xl mx-auto`
+- **Card**: `p-8 bg-white rounded-[24px]`

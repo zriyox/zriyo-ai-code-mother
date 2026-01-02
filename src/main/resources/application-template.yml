@@ -1,0 +1,130 @@
+# ===================================================================
+# Spring Boot 核心配置模板 (已脱敏)
+# 使用说明：
+# 1. 将此文件更名为 application.yml 或 application-dev.yml
+# 2. 替换 ${} 中的占位符为实际数值，或在环境变量中定义同名变量
+# ===================================================================
+
+spring:
+  application:
+    # 应用名称：标识项目身份
+    name: ${APP_NAME:zriyo-ai-code}
+
+  # --- 数据库配置 ---
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # 格式：jdbc:mysql://[地址]:[端口]/[数据库名]
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:your_database}?useSSL=false&serverTimezone=UTC
+    username: ${DB_USER:root}
+    password: ${DB_PASS:your_password_here}
+
+  # --- 邮件服务配置 ---
+  mail:
+    host: ${MAIL_HOST:smtp.qq.com}
+    username: ${MAIL_USER:your_email@example.com}
+    # 注意：此处应填写 SMTP 授权码而非邮箱登录密码
+    password: ${MAIL_PASS:your_smtp_auth_code}
+    properties.mail.smtp.auth: true
+    properties.mail.smtp.starttls.enable: true
+    default-encoding: utf-8
+
+  # --- Redis 缓存配置 ---
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DB:0}
+      password: ${REDIS_PASS:your_redis_password}
+      timeout: 10s
+
+server:
+  # 服务端口号
+  port: ${SERVER_PORT:8123}
+  servlet:
+    # 接口统一前缀
+    context-path: ${CONTEXT_PATH:/dev/api}
+
+# ===================================================================
+# 自定义业务配置
+# ===================================================================
+
+app:
+  # SQL 审计开关：开发环境建议 true，生产环境建议 false
+  sql-audit-enabled: ${SQL_AUDIT:true}
+
+# --- Langchain4j AI 模型配置 ---
+langchain4j:
+  open-ai:
+    chat-model: &ai_config
+      # API 中转地址
+      base-url: ${AI_BASE_URL:https://api.example.com/v1}
+      api-keys:
+        - ${AI_API_KEY:your_sk_key_here}
+      # 使用的模型名称
+      model-name: ${AI_MODEL:gpt-4o}
+      strict-json-schema: true
+      response-format: json_object
+      max-tokens: 12000
+      log-requests: false
+      log-responses: false
+      timeout: 120s
+    # 流式传输配置（继承上方基本配置）
+    streaming-chat-model:
+      <<: *ai_config
+      log-requests: true
+      log-responses: true
+
+# --- 第三方平台集成 (敏感信息) ---
+# 目前弃用 个人不支持接入
+wechat:
+  # 微信 AppID
+  appid: ${WX_APPID:your_wx_appid}
+  # 微信密钥
+  appsecret: ${WX_SECRET:your_wx_secret}
+  # 微信回调地址
+  redirect-uri: ${WX_REDIRECT:https://yourdomain.com/callback}
+  scope: snsapi_login
+
+authing:
+  # Authing 认证平台配置
+  app-id: ${AUTHING_ID:your_authing_id}
+  app-secret: ${AUTHING_SECRET:your_authing_secret}
+  app-host: ${AUTHING_HOST:https://your-tenant.authing.cn}
+
+# --- S3 对象存储配置 (RustFS) ---
+rustfs:
+  s3:
+    endpoint: ${S3_ENDPOINT:https://your-s3-endpoint.com}
+    access-key: ${S3_ACCESS_KEY:your_access_key}
+    secret-key: ${S3_SECRET_KEY:your_secret_key}
+    buckets:
+      avatars:
+        name: ${BUCKET_AVATAR:user-avatars}
+        type: PUBLIC
+      documents:
+        name: ${BUCKET_DOC:code-docs}
+        type: PUBLIC
+      appImage:
+        name: ${BUCKET_IMG:app-images}
+        type: PUBLIC
+      default:
+        name: ${BUCKET_DEFAULT:default-bucket}
+        type: PRIVATE
+
+# --- 外部图片 API ---
+sogou:
+  api:
+    url: ${SOGOU_API_URL:https://cn.apihz.cn/api/img/apihzimgsougou.php}
+    id: ${SOGOU_ID:your_api_id}
+    key: ${SOGOU_KEY:your_api_key}
+
+view:
+  app:
+    # 视图资源前缀
+    prefix: ${VIEW_PREFIX:/dev/api/app/view/}
+
+logging:
+  level:
+    # 日志级别控制
+    com.zriyo.aicodemother.ai.tools: debug
+    root: info

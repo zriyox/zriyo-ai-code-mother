@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zriyo.aicodemother.mapper.DeploymentHistoryMapper">
+
+    <select id="selectOneNewData" resultType="com.zriyo.aicodemother.model.entity.DeploymentHistory">
+        SELECT app_id, deploy_name, version, deploy_time FROM deployment_history WHERE app_id = #{appId} ORDER BY deploy_time DESC LIMIT 1
+</select>
+    <select id="getDeploymentHistoryWithCursorPagination"
+            resultType="com.zriyo.aicodemother.model.entity.DeploymentHistory">
+        SELECT d.id,d.app_id,d.deploy_name,d.deploy_time,d.version FROM deployment_history as d WHERE  d.id > #{id} ORDER BY deploy_time ASC LIMIT 15
+    </select>
+    <select id="selectLatestByAppId" resultType="com.zriyo.aicodemother.model.entity.DeploymentHistory">
+        SELECT app_id, deploy_name, version, deploy_time FROM deployment_history WHERE app_id = #{appId} ORDER BY deploy_time DESC LIMIT 1
+    </select>
+</mapper>

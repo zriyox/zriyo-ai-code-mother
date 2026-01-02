@@ -1,0 +1,72 @@
+# ======================
+# 构建与依赖目录
+# ======================
+target/
+build/
+.gradle/
+out/
+!gradle/wrapper/gradle-wrapper.jar
+
+# ======================
+# IDE 与编辑器
+# ======================
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+.mvn
+
+# ======================
+# 日志与临时文件
+# ======================
+*.log
+logs/
+.DS_Store
+Thumbs.db
+*~
+
+# ======================
+# 敏感配置（禁止提交真实密钥）
+# ======================
+src/main/resources/application.yml
+application-prod.yml
+application-local.yml
+application-secrets.yml
+application-dev.yml
+secrets/
+.env
+.env.local
+.env.*.local
+
+# ======================
+# tmp/code_output 特殊规则
+# ======================
+# 忽略 code_output 下所有内容
+tmp/code_output/*
+
+# 但保留 code_deploy 和 code_version 目录结构（通过 .gitkeep）
+!tmp/code_output/code_deploy/
+!tmp/code_output/code_version/
+
+# 允许跟踪 .gitkeep 文件（用于保留空目录）
+!tmp/code_output/code_deploy/.gitkeep
+!tmp/code_output/code_version/.gitkeep
+
+# 禁止跟踪这两个目录下的其他所有文件
+tmp/code_output/code_deploy/*
+!tmp/code_output/code_deploy/.gitkeep
+
+tmp/code_output/code_version/*
+!tmp/code_output/code_version/.gitkeep
+
+# 但允许跟踪 config 目录及其内容
+!tmp/code_output/config/
+!tmp/code_output/config/**
+
+# 排除 config 目录下的 node_modules
+tmp/code_output/config/node_modules/

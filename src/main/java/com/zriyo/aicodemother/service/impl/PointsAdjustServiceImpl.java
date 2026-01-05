@@ -1,4 +1,3 @@
-// com.zriyo.aicodemother.service.points.impl.PointsAdjustServiceImpl
 package com.zriyo.aicodemother.service.impl;
 
 import com.mybatisflex.core.query.QueryWrapper;

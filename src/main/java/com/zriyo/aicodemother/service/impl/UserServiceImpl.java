@@ -242,18 +242,39 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     public LoginUserVO findOrCreateLocalUser(String authingId, String phone, String photo, String userName) {
         User user = userMapper.selectOneByQuery(new QueryWrapper().eq(User::getAuthingSub, authingId));
         if (Objects.isNull(user)) {
-            String uuid = UUID.randomUUID().toString().replace("-", "");
-            String password = uuid.substring(0, 16);
-            user = new User();
-            user.setAuthingSub(authingId);
-            user.setPhone(phone);
-            user.setUserAvatar(photo);
-            if (StrUtil.isNotBlank(userName)) {
-                user.setUserName(userName);
+            user = userMapper.selectOneByQuery(new QueryWrapper().eq(User::getPhone, phone));
+            if (Objects.isNull(user)) {
+                String uuid = UUID.randomUUID().toString().replace("-", "");
+                String password = uuid.substring(0, 16);
+                user = new User();
+                user.setAuthingSub(authingId);
+                user.setPhone(phone);
+                user.setUserAvatar(photo);
+                if (StrUtil.isNotBlank(userName)) {
+                    user.setUserName(userName);
+                }
+                fillBaseUserInfo(user, password);
+                try {
+                    userMapper.insert(user);
+                } catch (Exception e) {
+                    user = userMapper.selectOneByQuery(new QueryWrapper().eq(User::getAuthingSub, authingId));
+                    if (user == null && StrUtil.isNotBlank(phone)) {
+                        user = userMapper.selectOneByQuery(new QueryWrapper().eq(User::getPhone, phone));
+                    }
+
+                    if (user != null) {
+                        return BeanCopyUtil.copy(user, LoginUserVO.class);
+                    }
+                    log.error("用户创建失败: {}", e.getMessage());
+                    throw new BusinessException(ErrorCode.SYSTEM_ERROR, "用户创建失败，请重试");
+                }
+            } else {
+                User updateOpenId = UpdateEntity.of(User.class, user.getId());
+                updateOpenId.setAuthingSub(authingId);
+                userMapper.update(updateOpenId);
             }
-            fillBaseUserInfo(user, password);
-            userMapper.insert(user);
         }
+
         return BeanCopyUtil.copy(user, LoginUserVO.class);
     }
 

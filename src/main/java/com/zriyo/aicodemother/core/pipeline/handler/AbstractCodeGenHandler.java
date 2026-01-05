@@ -228,7 +228,8 @@ public abstract class AbstractCodeGenHandler extends CodeGenHandler {
         AiCodeGenStage stage = getStage();
         String stageName = stage.getValue();
         log.info(">>> 阶段开始: {}", stageName);
-        codeGenRecordService.start(context, stage);
+        codeGenRecordService
+                .start(context, stage);
 
         Flux<ServerSentEvent<Object>> executionFlow = doExecute(context)
                 .onErrorResume(e -> {

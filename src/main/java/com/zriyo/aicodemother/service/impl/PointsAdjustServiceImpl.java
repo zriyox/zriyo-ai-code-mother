@@ -85,9 +85,11 @@ public class PointsAdjustServiceImpl implements PointsAdjustService {
 
     @Override
     public void validatePoints(Long loginId) {
-        UserPoints userPoints = userPointsMapper.selectOneByQuery(new QueryWrapper().eq(UserPoints::getUserId, loginId));
+        UserPoints userPoints = userPointsMapper
+                .selectOneByQuery(new QueryWrapper()
+                        .eq(UserPoints::getUserId, loginId));
         if (userPoints == null) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+            throw new BusinessException(ErrorCode.INSUFFICIENT_POINTS,"请尝试右上角签到后,创建应用吧～");
         }
         if (userPoints.getAvailablePoints() <= 0){
             throw new BusinessException(ErrorCode.INSUFFICIENT_POINTS);

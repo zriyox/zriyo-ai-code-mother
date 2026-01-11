@@ -434,7 +434,6 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             return taskSinks.get(appId).asFlux().mergeWith(createPingFlux());
         }
         ThrowUtils.throwIf(StrUtil.isBlank(message), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
-        // --- 2. 参数校验与基础数据准备 ---
         App app = getApp(appId, userId);
         ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR);
 
@@ -444,19 +443,17 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             return Flux.just(SseEventBuilder.of(StreamMessageTypeEnum.ERROR, "应用生成类型异常"));
         }
 
-        // --- 3. 任务锁判定 (防止并发) ---
         Boolean taskRunning = RedisUtils.getCacheObject(RedisConstants.AI_CODE_GEN_TASK_RUNNING + appId);
         if (Boolean.TRUE.equals(taskRunning)) {
             // 内存没 Sink 但 Redis 有锁，说明是集群其它节点任务或异常残留
             throw new BusinessException(ErrorCode.EXECUTING);
         }
 
-        // --- 4. 业务初始化 ---
         // 判定是否为首次构建
         ChatHistory skeletonRecord = chatHistoryService.getOne(new QueryWrapper()
                 .eq(ChatHistory::getAppId, appId)
                 .eq(ChatHistory::getMessageType, ChatHistoryMessageTypeEnum.SKELETON.getValue()));
-        boolean isFirstBuild = Objects.isNull(skeletonRecord);
+        boolean isFirstBuild = Objects.isNull(skeletonRecord.getMessage());
 
         GenerationContext context = new GenerationContext();
         context.setAppId(appId);
@@ -467,25 +464,24 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         context.setIsOosUrl(StrUtil.isNotBlank(app.getCover()));
         context.setIsFirstBuild(isFirstBuild);
 
-        if (context.getIsFirstBuild()) {
+        if (!context.getIsFirstBuild()) {
             pointsAdjustService.adjustPoints(userId, PointsReasonEnum.CHAT_CONSUME, appId,null);
         } else {
             pointsAdjustService.adjustPoints(userId, PointsReasonEnum.APP_GENERATE, appId,null);
         }
 
-        // --- 5. 创建消息分发中心 (Sink) ---
         Sinks.Many<ServerSentEvent<Object>> sink = Sinks.many().replay().all();
         taskSinks.put(appId, sink);
         RedisUtils.setCacheObject(RedisConstants.AI_CODE_GEN_TASK_RUNNING + appId, true);
 
-        // --- 6. 异步开启 Pipeline 任务 (不随 HTTP 连接断开而停止) ---
+        // 异步开启 Pipeline 任务 (不随 HTTP 连接断开而停止) ---
         Flux.defer(() -> {
                     AiContextHolder.set(MonitorContext.builder()
                             .appId(String.valueOf(appId))
                             .userId(String.valueOf(userId))
                             .build());
 
-                    // A. 异步优化提示词 & 发送 SSE 状态
+                    // 异步优化提示词 & 发送 SSE 状态
                     Flux<ServerSentEvent<Object>> optimizationFlux = Flux.empty();
                     if (context.getIsFirstBuild() && context.getRuntimeFeedback() == null) {
                         optimizationFlux = Flux.concat(

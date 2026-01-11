@@ -1,4 +1,4 @@
-package com.zriyo.api.dto.message;
+package com.zriyo.common.constant.message;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

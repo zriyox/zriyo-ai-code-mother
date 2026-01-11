@@ -1,8 +1,8 @@
 package com.zriyo.api.dto;
 
-import com.zriyo.aicodemother.common.PageRequest;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.springframework.data.domain.PageRequest;
 
 import java.io.Serializable;
 

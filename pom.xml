@@ -11,6 +11,7 @@
     <groupId>com.zriyo</groupId>
     <artifactId>zriyo-ai-code-mother</artifactId>
     <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
     <name>zriyo-ai-code-mother</name>
     <description>zriyo-ai-code-mother</description>
     <url/>
@@ -20,6 +21,13 @@
     <developers>
         <developer/>
     </developers>
+    <modules>
+        <module>zriyo-common</module>
+        <module>zriyo-api</module>
+        <module>zriyo-user-service</module>
+        <module>zriyo-codegen-service</module>
+        <module>zriyo-storage-engine</module>
+    </modules>
     <scm>
         <connection/>
         <developerConnection/>

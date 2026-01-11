@@ -1,7 +1,8 @@
 package com.zriyo.common.util;
 
-import com.zriyo.aicodemother.model.message.MessageData;
-import com.zriyo.aicodemother.model.message.StreamMessageTypeEnum;
+
+import com.zriyo.common.constant.message.MessageData;
+import com.zriyo.common.constant.message.StreamMessageTypeEnum;
 import org.springframework.http.codec.ServerSentEvent;
 import reactor.core.publisher.FluxSink;
 

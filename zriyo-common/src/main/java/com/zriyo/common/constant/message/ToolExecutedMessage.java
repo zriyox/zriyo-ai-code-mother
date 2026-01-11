@@ -1,4 +1,4 @@
-package com.zriyo.api.dto.message;
+package com.zriyo.common.constant.message;
 
 import dev.langchain4j.service.tool.ToolExecution;
 import lombok.Data;

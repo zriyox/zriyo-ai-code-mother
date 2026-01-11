@@ -2,7 +2,7 @@ package com.zriyo.api.dto;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.zriyo.aicodemother.model.enums.CaptchaType;
+import com.zriyo.api.enums.CaptchaType;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.NoArgsConstructor;

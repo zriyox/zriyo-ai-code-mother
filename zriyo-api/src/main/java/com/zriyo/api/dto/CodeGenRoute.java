@@ -1,7 +1,8 @@
 // com.zriyo.aicodemother.model.dto.CodeGenRoute.java
 package com.zriyo.api.dto;
 
-import com.zriyo.aicodemother.model.enums.CodeGenTypeEnum;
+
+import com.zriyo.api.enums.CodeGenTypeEnum;
 
 public class CodeGenRoute {
     private CodeGenTypeEnum type;

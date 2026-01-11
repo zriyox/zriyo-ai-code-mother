@@ -1,6 +1,6 @@
 package com.zriyo.api.dto;
 
-import com.zriyo.aicodemother.model.enums.EmailCaptchaType;
+import com.zriyo.api.enums.EmailCaptchaType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;

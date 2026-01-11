@@ -453,7 +453,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         ChatHistory skeletonRecord = chatHistoryService.getOne(new QueryWrapper()
                 .eq(ChatHistory::getAppId, appId)
                 .eq(ChatHistory::getMessageType, ChatHistoryMessageTypeEnum.SKELETON.getValue()));
-        boolean isFirstBuild = Objects.isNull(skeletonRecord.getMessage());
+        boolean isFirstBuild = Objects.isNull(skeletonRecord);
 
         GenerationContext context = new GenerationContext();
         context.setAppId(appId);
@@ -464,10 +464,10 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         context.setIsOosUrl(StrUtil.isNotBlank(app.getCover()));
         context.setIsFirstBuild(isFirstBuild);
 
-        if (!context.getIsFirstBuild()) {
-            pointsAdjustService.adjustPoints(userId, PointsReasonEnum.CHAT_CONSUME, appId,null);
-        } else {
+        if (context.getIsFirstBuild()) {
             pointsAdjustService.adjustPoints(userId, PointsReasonEnum.APP_GENERATE, appId,null);
+        } else {
+            pointsAdjustService.adjustPoints(userId, PointsReasonEnum.CHAT_CONSUME, appId,null);
         }
 
         Sinks.Many<ServerSentEvent<Object>> sink = Sinks.many().replay().all();

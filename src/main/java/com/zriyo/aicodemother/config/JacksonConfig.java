@@ -1,5 +1,6 @@
 package com.zriyo.aicodemother.config;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.module.SimpleModule;
@@ -27,7 +28,8 @@ public class JacksonConfig {
         longModule.addSerializer(Long.class, ToStringSerializer.instance);
         longModule.addSerializer(Long.TYPE, ToStringSerializer.instance);
         mapper.registerModule(longModule);
-
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        mapper.configure(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT, true);
         // 时间格式
         JavaTimeModule timeModule = new JavaTimeModule();
         DateTimeFormatter f = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");

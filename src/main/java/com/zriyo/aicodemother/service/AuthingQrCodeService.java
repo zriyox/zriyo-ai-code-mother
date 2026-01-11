@@ -8,9 +8,11 @@ import cn.authing.sdk.java.model.AuthenticationClientOptions;
 import cn.authing.sdk.java.model.AuthingRequestConfig;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.cfg.CoercionAction;
+import com.fasterxml.jackson.databind.cfg.CoercionInputShape;
+import com.fasterxml.jackson.databind.type.LogicalType;
 import com.zriyo.aicodemother.exception.BusinessException;
 import com.zriyo.aicodemother.exception.ErrorCode;
-import com.zriyo.aicodemother.mapper.UserMapper;
 import com.zriyo.aicodemother.model.vo.LoginUserVO;
 import com.zriyo.aicodemother.model.vo.QrCodeSession;
 import com.zriyo.aicodemother.util.UserAuthUtil;
@@ -20,6 +22,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 @Slf4j
@@ -35,12 +39,9 @@ public class AuthingQrCodeService {
     @Value("${authing.app-host}")
     private String appHost;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
-    private final UserMapper userMapper;
-
+    private final ObjectMapper objectMapper;
 
     private final UserService userService;
-
 
     // 1. 生成二维码
     public GeneQRCodeDataDto generateWechatMiniProgramQrCode() throws Exception {
@@ -106,18 +107,40 @@ public class AuthingQrCodeService {
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR);
             }
 
-            AuthenticationClientOptions clientOptions = new AuthenticationClientOptions();
-            clientOptions.setAppId(appId);
-            clientOptions.setAppSecret(
-                    appSecret
-            );
+            // === 以下为关键修改：不再使用 clientTwo.getProfile()，改为手动调用 + 安全反序列化 ===
+            String accessToken = tokenSet.getAccessToken();
+            AuthingRequestConfig profileConfig = new AuthingRequestConfig();
+            profileConfig.setUrl("/api/v3/get-profile");
+            profileConfig.setMethod("GET");
+            // 必须使用可变 Map！
+            Map<String, String> headers = new HashMap<>();
+            headers.put("Authorization", "Bearer " + accessToken);
+            profileConfig.setHeaders(headers);
 
-            clientOptions.setAppHost(appHost);
-            clientOptions.setAccessToken(tokenSet.getAccessToken());
-            AuthenticationClient clientTwo = new AuthenticationClient(clientOptions);
-            UserSingleRespDto tokenUserInfo = clientTwo.getProfile(new GetProfileDto());
-            // 本地 系统用户 id
-            LoginUserVO orCreateLocalUser = userService.findOrCreateLocalUser(tokenUserInfo.getData().getUserId(), tokenUserInfo.getData().getPhone(), tokenUserInfo.getData().getPhoto(), tokenUserInfo.getData().getName());
+            String profileResponse = client.request(profileConfig);
+
+            // 创建安全的 ObjectMapper，允许空字符串转为 null（避免 gender="" 导致枚举反序列化失败）
+            objectMapper.coercionConfigFor(LogicalType.Enum)
+                    .setCoercion(CoercionInputShape.EmptyString, CoercionAction.AsNull);
+
+            UserSingleRespDto tokenUserInfo = objectMapper.readValue(profileResponse, UserSingleRespDto.class);
+
+            if (tokenUserInfo == null || tokenUserInfo.getData() == null) {
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "未能获取有效用户信息");
+            }
+
+            String userId = tokenUserInfo.getData().getUserId();
+            if (userId == null || userId.trim().isEmpty()) {
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "用户ID缺失");
+            }
+
+            // 本地系统用户 id
+            LoginUserVO orCreateLocalUser = userService.findOrCreateLocalUser(
+                    userId,
+                    tokenUserInfo.getData().getPhone(),
+                    tokenUserInfo.getData().getPhoto(),
+                    tokenUserInfo.getData().getName()
+            );
             UserAuthUtil.userLogin(orCreateLocalUser.getId(), orCreateLocalUser);
             orCreateLocalUser.setToken(UserAuthUtil.getTokenValue());
             qrCodeSession.setUser(orCreateLocalUser);

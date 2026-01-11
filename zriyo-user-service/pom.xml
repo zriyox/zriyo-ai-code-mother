@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.zriyo</groupId>
+        <artifactId>zriyo-ai-code-mother</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>zriyo-user-service</artifactId>
+
+    <dependencies>
+        <!-- 依赖公共模块 (工具类、异常定义) -->
+        <dependency>
+            <groupId>com.zriyo</groupId>
+            <artifactId>zriyo-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- 依赖 API 模块 (DTO, VO, Service接口) -->
+        <dependency>
+            <groupId>com.zriyo</groupId>
+            <artifactId>zriyo-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- 这是一个独立的微服务，需要打包成可执行 JAR -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

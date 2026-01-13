@@ -95,7 +95,6 @@ public final class VirtualThreadUtils {
         }
     }
 
-    // --- 辅助方法 ---
 
     /**
      * 包装 Runnable 以捕获并记录未处理的异常。

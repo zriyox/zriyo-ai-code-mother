@@ -1,8 +1,8 @@
 package com.zriyo.common.util;
 
-import com.zriyo.aicodemother.exception.BusinessException;
-import com.zriyo.aicodemother.exception.ErrorCode;
-import com.zriyo.aicodemother.model.AppConstant;
+import com.zriyo.common.constant.AppConstant;
+import com.zriyo.common.exception.BusinessException;
+import com.zriyo.common.exception.ErrorCode;
 import jodd.util.StringUtil;
 import lombok.extern.slf4j.Slf4j;
 

@@ -56,7 +56,9 @@ public class AuthingQrCodeService {
         return geneQRCodeRespDto.getData();
     }
 
-    // 2. 轮询状态 + ticket 换 token + 解析 id_token
+    // 2. 前端轮询状态接口 + 如果前端扫码 第三方状态改变 ticket 换 token 第三方平台为了安全
+    // + 解析 id_token 后续有存在登入 查到用户的具体信息  不存在注册 并且返回当前系统的 token
+    // 3.微信登入是对方回调我们的接口 并且携带信息
     public QrCodeSession checkQrCodeStatus(String qrcodeId) {
         try {
             AuthenticationClient client = createAuthClient();
@@ -67,6 +69,7 @@ public class AuthingQrCodeService {
             config.setBody(req);
             config.setMethod("GET");
             String response = client.request(config);
+
             CheckQRCodeStatusDataDto data = BaseClient.deserialize(response, CheckQRCodeStatusDataDto.class);
             String status;
             if (data.getStatus() == null) {

@@ -72,10 +72,14 @@ public class UserController {
     @PostMapping("/login")
     public BaseResponse<LoginUserVO> userLogin(@RequestBody UserLoginRequest userLoginRequest, HttpServletRequest request) {
         ThrowUtils.throwIf(userLoginRequest == null, ErrorCode.PARAMS_ERROR);
+        //行为验证码必须创建的实体
         CaptchaVO captchaVO = new CaptchaVO();
         captchaVO.setCaptchaVerification(userLoginRequest.getCaptchaVerification());
+        //校验行为验证码是不是正确的
         ResponseModel verification = captchaService.verification(captchaVO);
+        //验证失败
         ThrowUtils.throwIf(!verification.isSuccess(), ErrorCode.OPERATION_ERROR);
+
         String userAccount = userLoginRequest.getUserAccount();
         String userPassword = userLoginRequest.getUserPassword();
         LoginUserVO loginUserVO = userService.userLogin(userAccount, userPassword, request);

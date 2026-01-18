@@ -74,7 +74,8 @@ public class AiCodeGeneratorServiceFactoryV2 {
 
 
     private AiCodeGeneratorServiceV2 createAiCodeGeneratorService(Long appId, String filePath, CodeGenTypeEnum codeGenType, String filePathProject) {
-        MessageWindowChatMemory chatMemory = MessageWindowChatMemory.builder()
+        MessageWindowChatMemory chatMemory = MessageWindowChatMemory
+                .builder()
                 .id("code:" + filePath)
                 .chatMemoryStore(redisChatMemoryStore)
                 .maxMessages(30)

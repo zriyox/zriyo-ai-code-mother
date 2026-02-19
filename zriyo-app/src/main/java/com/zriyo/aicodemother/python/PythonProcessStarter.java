@@ -36,6 +36,9 @@ public class PythonProcessStarter implements ApplicationRunner {
     @Value("${python.auto-start:true}")
     private boolean autoStart;
 
+    @Value("${python.reload:true}")
+    private boolean pythonReload;
+
     private Process pythonProcess;
 
     @Override
@@ -63,22 +66,26 @@ public class PythonProcessStarter implements ApplicationRunner {
             return;
         }
 
-        log.info("Python 项目路径: {}", projectPath);
+        log.info("Python 项目路径: {}, 热重载: {}", projectPath, pythonReload);
 
         ProcessBuilder pb;
+        String reloadFlag = pythonReload ? " --reload" : "";
+
         if (os.contains("win")) {
             String venvPython = projectPath.resolve("venv/Scripts/python.exe").toString();
             pb = new ProcessBuilder(
                 venvPython,
                 "-m", "uvicorn", "app.main:app",
                 "--host", "127.0.0.1",
-                "--port", String.valueOf(pythonPort)
+                "--port", String.valueOf(pythonPort),
+                "--reload"  // Windows: 直接加参数
             );
         } else {
             pb = new ProcessBuilder(
                 "bash", "-c",
                 "cd " + projectPath + " && source venv/bin/activate && " +
-                "uvicorn app.main:app --host 127.0.0.1 --port " + pythonPort
+                "uvicorn app.main:app --host 127.0.0.1 --port " + pythonPort +
+                reloadFlag  // Unix: 根据配置添加
             );
         }
 

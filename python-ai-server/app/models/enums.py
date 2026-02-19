@@ -127,12 +127,38 @@ class ExecutionStage(str, Enum):
 
 
 # ==================== 兼容旧代码 ====================
+# 使用 StrEnum 作为兼容层
 
-class EventType(SseEventType):
+from enum import StrEnum
+
+
+class EventType(StrEnum):
     """兼容旧代码的别名"""
 
-    START = SseEventType.REQUEST_START
-    COMPLETE = SseEventType.REQUEST_COMPLETE
-    AGENT_THINKING = SseEventType.AGENT_THOUGHT
+    START = "request_start"
+    COMPLETE = "request_complete"
+    AGENT_THINKING = "agent_thought"
     FILE_READ = "file_read"
     FILE_WRITTEN = "file_written"
+
+    # 同时兼容新的事件类型
+    REQUEST_START = "request_start"
+    REQUEST_COMPLETE = "request_complete"
+    AGENT_THOUGHT = "agent_thought"
+    AGENT_SWITCH = "agent_switch"
+    AGENT_START = "agent_start"
+    AGENT_COMPLETE = "agent_complete"
+    TOOL_CALL = "tool_call"
+    TOOL_RESULT = "tool_result"
+    TOOL_ERROR = "tool_error"
+    PROGRESS = "progress"
+    STAGE = "stage"
+    FILE_CREATED = "file_created"
+    FILE_UPDATED = "file_updated"
+    TEXT_CHUNK = "text_chunk"
+    CODE_CHUNK = "code_chunk"
+    MARKDOWN_CHUNK = "markdown_chunk"
+    ERROR = "error"
+    WARNING = "warning"
+    HEARTBEAT = "heartbeat"
+    LOG = "log"

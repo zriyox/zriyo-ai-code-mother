@@ -94,7 +94,8 @@ public class PythonProcessStarter implements ApplicationRunner {
 
         pythonProcess = pb.start();
 
-        new Thread(this::readProcessOutput, "Python-Output-Reader").start();
+        // 使用虚拟线程读取进程输出（适合 I/O 密集型任务）
+        Thread.ofVirtual().name("Python-Output-Reader").start(this::readProcessOutput);
 
         log.info("Python 进程已启动，PID: {}", pythonProcess.pid());
         log.info("等待 Python 服务启动在 http://127.0.0.1:{}", pythonPort);

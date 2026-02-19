@@ -1,7 +1,7 @@
 package com.zriyo.aicodemother.config;
 
 import lombok.Data;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -49,7 +49,7 @@ public class S3Config {
      * - 强制 Path-Style
      */
     @Bean
-    @ConditionalOnProperty(prefix = "rustfs.s3", name = "endpoint")
+    @ConditionalOnExpression("'${rustfs.s3.endpoint:}' != '' and '${rustfs.s3.endpoint:}' != null")
     public S3Client s3Client() {
         return S3Client.builder()
                 .endpointOverride(URI.create(endpoint))
@@ -93,7 +93,7 @@ public class S3Config {
      * 必须配置 Path-Style 才能正确生成 bucket.domain 格式的 URL
      */
     @Bean
-    @ConditionalOnProperty(prefix = "rustfs.s3", name = "endpoint")
+    @ConditionalOnExpression("'${rustfs.s3.endpoint:}' != '' and '${rustfs.s3.endpoint:}' != null")
     public S3Presigner s3Presigner() {
         return S3Presigner.builder()
                 .endpointOverride(URI.create(endpoint))

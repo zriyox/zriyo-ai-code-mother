@@ -1,4 +1,4 @@
-package com.zriyo.model.dto;
+package com.zriyo.model.entity;
 
 import com.zriyo.common.entity.BaseEntity;
 import lombok.Data;

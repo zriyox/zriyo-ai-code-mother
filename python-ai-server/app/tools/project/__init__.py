@@ -1,6 +1,6 @@
 """
-前端项目生成工具
-复制模板 + 读取 Skill 规范 + LLM 生成代码
+前端项目初始化工具
+负责确定性初始化：复制模板 + 软链接依赖。
 """
 
 import os
@@ -13,6 +13,10 @@ from loguru import logger
 from app.config.settings import settings, get_project_path
 from app.llm.client import LlmClient
 from app.models.llm import LlmConfig, LlmMessage
+from app.prompts.project_prompts import (
+    build_codegen_system_prompt,
+    build_skill_selector_prompts,
+)
 
 
 class ProjectGenerator:
@@ -43,7 +47,7 @@ class ProjectGenerator:
     def generate(
         self,
         app_id: int,
-        requirement: str,
+        requirement: Optional[str] = None,
         project_name: str = "ai-generated-app",
     ) -> Dict[str, Any]:
         """
@@ -51,7 +55,7 @@ class ProjectGenerator:
 
         Args:
             app_id: 应用 ID
-            requirement: 用户需求描述
+            requirement: 用户需求描述（可选，初始化阶段不参与 LLM）
             project_name: 项目名称
 
         Returns:
@@ -60,7 +64,8 @@ class ProjectGenerator:
         project_path = get_project_path(app_id)
 
         logger.info(f"Generating frontend project: {project_path}")
-        logger.info(f"Requirement: {requirement}")
+        if requirement:
+            logger.info(f"Requirement (ignored in init stage): {requirement}")
 
         try:
             # 1. 复制模板
@@ -69,17 +74,9 @@ class ProjectGenerator:
             # 2. 创建 node_modules 软链接
             self._link_node_modules(project_path)
 
-            # 3. 读取 Skill 规范
-            skills_context = self._load_skills_context(requirement)
-
-            # 4. 生成代码 (返回待生成任务)
-            generation_tasks = self._plan_generation(requirement, skills_context)
-
             return {
                 "success": True,
                 "project_path": str(project_path),
-                "generation_tasks": generation_tasks,
-                "skills_used": list(skills_context.keys()),
             }
 
         except Exception as e:
@@ -91,35 +88,75 @@ class ProjectGenerator:
 
     def _copy_template(self, dest_path: Path, project_name: str) -> None:
         """
-        复制脚手架模板
+        复制最小脚手架模板（显式白名单）。
 
-        排除:
-        - node_modules (使用软链接)
-        - dist (构建产物)
-        - .git (版本控制)
+        设计目标：
+        1. 仅复制“通用配置 + 最小入口”文件，避免把业务示例页带入新项目。
+        2. 行为可读、可审计：白名单都写在代码里，后续维护只需改这里。
+
+        会复制：
+        - 根目录配置：package/vite/ts/eslint/tailwind 等
+        - 最小入口：src/main.ts、src/App.vue
+        - 类型声明：src/vite-env.d.ts、src/types/env.d.ts、types/*.d.ts
         """
-        exclude = {"node_modules", "dist", ".git", "__pycache__"}
+        allow_root_files = {
+            ".env.example",
+            ".eslintrc-auto-import.json",
+            ".gitignore",
+            ".npmrc",
+            ".prettierrc.json",
+            "README.md",
+            "eslint.config.mjs",
+            "index.html",
+            "package-lock.json",
+            "package.json",
+            "postcss.config.js",
+            "tailwind.config.js",
+            "tsconfig.json",
+            "tsconfig.node.json",
+            "vite.config.ts",
+        }
+        allow_relative_files = {
+            "src/main.ts",
+            "src/App.vue",
+            "src/vite-env.d.ts",
+            "src/types/env.d.ts",
+            "src/assets/styles/variables.scss",
+            "types/auto-imports.d.ts",
+            "types/components.d.ts",
+        }
 
         if not dest_path.exists():
             dest_path.mkdir(parents=True)
 
-        for item in self.scaffold_path.iterdir():
-            if item.name in exclude:
-                continue
-            if item.is_dir():
-                dest = dest_path / item.name
-                if dest.exists():
-                    shutil.rmtree(dest)
-                shutil.copytree(item, dest)
+        # 复制根目录白名单文件
+        for filename in allow_root_files:
+            src = self.scaffold_path / filename
+            dst = dest_path / filename
+            if src.exists() and src.is_file():
+                shutil.copy2(src, dst)
             else:
-                shutil.copy2(item, dest_path / item.name)
+                logger.warning(f"Template root file missing, skipped: {src}")
+
+        # 复制相对路径白名单文件
+        for rel_path in allow_relative_files:
+            src = self.scaffold_path / rel_path
+            dst = dest_path / rel_path
+            if src.exists() and src.is_file():
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dst)
+            else:
+                logger.warning(f"Template file missing, skipped: {src}")
 
         # 更新 package.json 中的项目名称
         package_json = dest_path / "package.json"
         if package_json.exists():
             self._update_package_json(package_json, project_name)
 
-        logger.info(f"Template copied to {dest_path}")
+        logger.info(
+            f"Template copied to {dest_path} "
+            f"(root_files={len(allow_root_files)}, relative_files={len(allow_relative_files)})"
+        )
 
     def _update_package_json(self, package_path: Path, project_name: str) -> None:
         """更新 package.json"""
@@ -141,11 +178,14 @@ class ProjectGenerator:
         if dst.exists():
             shutil.rmtree(dst)
 
-        # 创建相对路径软链接
-        relative_src = os.path.relpath(src, project_path)
-        dst.symlink_to(relative_src)
+        # 创建相对路径软链接；跨盘符（Windows）时降级为绝对路径软链接
+        try:
+            link_target = os.path.relpath(src, project_path)
+        except ValueError:
+            link_target = str(src)
 
-        logger.info(f"node_modules linked: {dst} -> {src}")
+        dst.symlink_to(link_target)
+        logger.info(f"node_modules linked: {dst} -> {link_target}")
 
     def _load_skills_context(
         self,
@@ -216,21 +256,12 @@ class ProjectGenerator:
             return []
 
         available_text = "\n".join(f"- {s}" for s in available)
-        context_text = f"\n\n## 额外上下文\n{context}" if context else ""
-
-        system_prompt = (
-            "你是 Skill Selector。请从给定的技能列表中选择与需求最相关的技能。"
-            f"最多选择 {max_skills} 个，只能返回列表中的 ID。"
-            "如果不需要任何技能，返回空数组 []。输出必须是 JSON 数组，不要附加其他文字。"
-        )
-
-        user_prompt = (
-            f"## 用户需求\n{requirement}"
-            f"{context_text}\n\n"
-            "## 可用技能列表\n"
-            f"{available_text}\n\n"
-            "## 技能索引\n"
-            f"{skills_index}"
+        system_prompt, user_prompt = build_skill_selector_prompts(
+            requirement=requirement,
+            context=context,
+            available_text=available_text,
+            skills_index=skills_index,
+            max_skills=max_skills,
         )
 
         client = LlmClient(llm_config)
@@ -361,108 +392,9 @@ class ProjectGenerator:
             return None
         return clean
 
-    def _plan_generation(
-        self, requirement: str, skills_context: Dict[str, str]
-    ) -> List[Dict[str, Any]]:
-        """
-        规划代码生成任务
-
-        返回需要生成的文件列表和提示词
-        """
-        # 基础文件（总是生成）
-        base_files = [
-            "src/main.ts",
-            "src/App.vue",
-            "src/router/index.ts",
-            "src/stores/app.ts",
-        ]
-
-        # 根据需求确定需要生成的文件
-        files = base_files.copy()
-
-        requirement_lower = requirement.lower()
-
-        # 页面
-        if any(kw in requirement_lower for kw in ["页面", "管理", "后台", "dashboard", "admin"]):
-            files.extend([
-                "src/views/Dashboard.vue",
-                "src/layouts/DefaultLayout.vue",
-            ])
-
-        # 图表
-        if "chart" in requirement_lower or "图表" in requirement_lower:
-            files.append("src/components/charts/ChartCard.vue")
-
-        # 表格
-        if "table" in requirement_lower or "表格" in requirement_lower:
-            files.append("src/views/pages/TablePage.vue")
-
-        # 表单
-        if "form" in requirement_lower or "表单" in requirement_lower:
-            files.append("src/views/pages/FormPage.vue")
-
-        # 构建生成任务
-        tasks = []
-        for file_path in files:
-            tasks.append({
-                "file": file_path,
-                "type": self._get_file_type(file_path),
-            })
-
-        # 构建系统提示词
-        system_prompt = self._build_system_prompt(skills_context)
-
-        return {
-            "tasks": tasks,
-            "system_prompt": system_prompt,
-        }
-
-    def _get_file_type(self, file_path: str) -> str:
-        """获取文件类型"""
-        if file_path.endswith(".vue"):
-            return "vue-component"
-        elif file_path.endswith(".ts"):
-            return "typescript"
-        return "text"
-
     def _build_system_prompt(self, skills_context: Dict[str, str]) -> str:
         """构建给 LLM 的系统提示词"""
-        prompt = """你是 Vue 3 前端开发专家，正在帮用户生成代码。
-
-## 技术栈
-
-Vue 3.5.13 + TypeScript 5.8.0 + Vite 6.3.5
-Vue Router 4.5.0 + Pinia 2.2.8
-Element Plus 2.10.4 + Tailwind CSS 3.4.17
-@vueuse/core 11.3.0 + Day.js + Lodash-es
-
-## 代码规范
-
-"""
-
-        # 添加 SYSTEM.md 内容
-        if "SYSTEM.md" in skills_context:
-            prompt += skills_context["SYSTEM.md"] + "\n\n"
-
-        # 添加相关 Skill 文档
-        prompt += "## 参考文档\n\n"
-        for skill_name, content in skills_context.items():
-            if skill_name == "SYSTEM.md":
-                continue
-            prompt += f"### {skill_name}\n{content[:500]}...\n\n"
-
-        prompt += """
-## 工作流程
-
-1. 理解用户需求
-2. 参考上述文档规范
-3. 生成符合规范的代码
-
-## 输出格式
-
-直接输出完整的文件内容，不需要解释。
-"""
-        return prompt
+        return build_codegen_system_prompt(skills_context)
 
 
 # 单例

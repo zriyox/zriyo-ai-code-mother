@@ -1,6 +1,10 @@
 """
 Python AI Server - FastAPI 入口
-Agent 执行层（无状态）
+
+给 Java 同学的快速对照：
+- `app` ≈ Spring Boot 的 Application 启动类
+- `app.include_router(...)` ≈ `@RequestMapping` 控制器注册
+- `lifespan` ≈ 应用启动/关闭钩子（类似 `@PostConstruct` / `@PreDestroy`）
 """
 
 from contextlib import asynccontextmanager
@@ -68,7 +72,10 @@ TAGS_METADATA = [
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """应用生命周期管理"""
+    """
+    应用生命周期钩子：启动时记录环境信息，关闭时输出收尾日志。
+    Java 对照：类似 @PostConstruct / @PreDestroy 的组合。
+    """
     from loguru import logger
 
     # 启动时执行
@@ -110,16 +117,19 @@ setup_error_handlers(app)
 
 
 # 注册路由
-app.include_router(health_router, tags=["health"])
-app.include_router(internal_router)  # 内部路由已包含 prefix
-app.include_router(agent_router)
-app.include_router(project_router)
-app.include_router(plan_router)
+app.include_router(health_router, tags=["health"])  # 健康检查（K8s/LB 探针）
+app.include_router(internal_router)  # Java 内部调用接口（已自带 /api/internal 前缀）
+app.include_router(agent_router)  # 通用 Agent 接口
+app.include_router(project_router)  # 前端项目生成接口
+app.include_router(plan_router)  # 规划接口（先出计划，再按计划执行）
 
 
 @app.get("/")
 async def root():
-    """根路径"""
+    """
+    根路径健康返回，用于最轻量连通性检测。
+    输出：服务名、版本号、运行状态。
+    """
     return {
         "service": "Python AI Server",
         "version": "0.1.0",

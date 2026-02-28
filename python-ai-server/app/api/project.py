@@ -1,5 +1,9 @@
 """
-前端项目生成 API
+前端项目生成 API（Controller 层）。
+
+给 Java 同学：
+- 这里基本等价于 Spring MVC Controller
+- Pydantic `BaseModel` 可类比 Java DTO（带参数校验）
 """
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Response
@@ -22,11 +26,14 @@ router = APIRouter(prefix="/api/v1/project", tags=["project"])
 # ==================== 请求模型 ====================
 
 class GenerateProjectRequest(BaseModel):
-    """生成项目请求"""
+    """
+    GenerateProjectRequest 请求 DTO：定义接口入参结构与校验约束。
+    Java 对照：可类比 Controller 入参对象（Request DTO）。
+    """
     app_id: int = Field(..., description="应用 ID", ge=1)
-    requirement: str = Field(..., description="用户需求描述", min_length=1)
+    requirement: Optional[str] = Field(default=None, description="用户需求描述（初始化阶段可不传）")
     project_name: str = Field(default="ai-generated-app", description="项目名称")
-    auto_generate: bool = Field(default=False, description="是否自动生成代码（需要 LLM）")
+    auto_generate: bool = Field(default=False, description="预留字段，当前初始化阶段不使用")
 
     model_config = {
         "json_schema_extra": {
@@ -43,7 +50,10 @@ class GenerateProjectRequest(BaseModel):
 
 
 class GenerateCodeRequest(BaseModel):
-    """生成代码请求"""
+    """
+    GenerateCodeRequest 请求 DTO：定义接口入参结构与校验约束。
+    Java 对照：可类比 Controller 入参对象（Request DTO）。
+    """
     app_id: int = Field(..., description="应用 ID")
     file_path: str = Field(..., description="要生成的文件路径，如 src/views/Dashboard.vue")
     requirement: str = Field(..., description="代码需求描述")
@@ -51,19 +61,26 @@ class GenerateCodeRequest(BaseModel):
 
 
 class GenerateAndWriteRequest(BaseModel):
-    """生成并写入代码请求"""
+    """
+    GenerateAndWriteRequest 请求 DTO：定义接口入参结构与校验约束。
+    Java 对照：可类比 Controller 入参对象（Request DTO）。
+    """
     app_id: int = Field(..., description="应用 ID")
     task_id: Optional[str] = Field(default=None, description="任务 ID（可选，用于取消）")
     file_path: str = Field(..., description="要生成的文件路径，如 src/views/Dashboard.vue")
     requirement: str = Field(..., description="代码需求描述")
     llm_config: LlmConfig = Field(..., description="LLM 配置")
     plan_summary: Optional[str] = Field(default=None, description="规划摘要（可选）")
+    # dependencies/file_list 都是“上下文候选文件”，用于让模型参考已有代码风格
     dependencies: Optional[List[str]] = Field(default=None, description="依赖文件路径列表（可选）")
     file_list: Optional[List[str]] = Field(default=None, description="可读文件列表（可选）")
 
 
 class WriteCodeRequest(BaseModel):
-    """写入代码请求"""
+    """
+    WriteCodeRequest 请求 DTO：定义接口入参结构与校验约束。
+    Java 对照：可类比 Controller 入参对象（Request DTO）。
+    """
     app_id: int = Field(..., description="应用 ID")
     file_path: str = Field(..., description="文件路径")
     content: str = Field(..., description="文件内容")
@@ -72,23 +89,30 @@ class WriteCodeRequest(BaseModel):
 # ==================== 响应模型 ====================
 
 class GenerateProjectResponse(BaseModel):
-    """生成项目响应"""
+    """
+    GenerateProjectResponse 响应 DTO：定义接口出参结构。
+    Java 对照：可类比 Controller 返回对象（Response DTO）。
+    """
     success: bool
     project_path: Optional[str] = None
-    generation_tasks: Optional[Dict[str, Any]] = None
-    skills_used: Optional[List[str]] = None
     error: Optional[str] = None
 
 
 class FileWriteResponse(BaseModel):
-    """文件写入响应"""
+    """
+    FileWriteResponse 响应 DTO：定义接口出参结构。
+    Java 对照：可类比 Controller 返回对象（Response DTO）。
+    """
     success: bool
     file_path: str
     error: Optional[str] = None
 
 
 class GenerateAndWriteResponse(BaseModel):
-    """生成并写入代码响应"""
+    """
+    GenerateAndWriteResponse 响应 DTO：定义接口出参结构。
+    Java 对照：可类比 Controller 返回对象（Response DTO）。
+    """
     file_path: str
     code: str
     skills_used: List[str]
@@ -102,18 +126,19 @@ class GenerateAndWriteResponse(BaseModel):
     response_model=GenerateProjectResponse,
     summary="生成前端项目",
     description="""
-生成前端项目脚手架，包括：
+初始化前端项目脚手架，包括：
 1. 复制模板文件
 2. 创建 node_modules 软链接
-3. 加载相关 Skill 文档
-4. 返回代码生成计划
 
-**注意：** 此接口仅创建项目结构，不生成具体代码。
-使用 `/generate-code` 接口生成具体文件。
+**注意：** 该接口只做确定性初始化，不调用 LLM、不生成代码计划。
 """
 )
 async def generate_project(request: GenerateProjectRequest) -> GenerateProjectResponse:
-    """生成前端项目"""
+    """
+    路由处理函数：接收请求参数并调用下游能力。
+    输入：Pydantic 模型或 query 参数；输出：JSON 或流式响应。
+    说明：包含异步/流式处理逻辑，需关注事件边界与错误兜底。
+    """
     generator = get_generator()
 
     result = generator.generate(
@@ -140,7 +165,11 @@ async def generate_project(request: GenerateProjectRequest) -> GenerateProjectRe
 """
 )
 async def generate_code(request: GenerateCodeRequest) -> Dict[str, Any]:
-    """生成代码"""
+    """
+    路由处理函数：接收请求参数并调用下游能力。
+    输入：Pydantic 模型或 query 参数；输出：JSON 或流式响应。
+    说明：包含异步/流式处理逻辑，需关注事件边界与错误兜底。
+    """
     # TODO: 调用 LLM 生成代码
     generator = get_generator()
 
@@ -179,12 +208,18 @@ async def generate_and_write_code(
     request: GenerateAndWriteRequest,
     stream: bool = True,
 ) -> Response:
-    """生成并写入代码（支持 SSE）"""
+    """
+    生成并写入代码（支持 SSE）。
+
+    - `stream=true`：返回 `text/event-stream`，边生成边推送
+    - `stream=false`：等待完成后一次性返回 JSON
+    """
     agent = CodeAgent()
     trace_id = uuid.uuid4().hex
 
     if stream:
         async def event_stream():
+            # 这里把 Agent 的事件透传出去；如果中途报错，补一个 failed 完成事件
             try:
                 async for event in agent.generate_and_write_stream(
                     app_id=request.app_id,
@@ -249,7 +284,11 @@ async def generate_and_write_code(
 """
 )
 async def write_code(request: WriteCodeRequest) -> FileWriteResponse:
-    """写入代码到文件"""
+    """
+    路由处理函数：接收请求参数并调用下游能力。
+    输入：Pydantic 模型或 query 参数；输出：JSON 或流式响应。
+    说明：包含异步/流式处理逻辑，需关注事件边界与错误兜底。
+    """
     from app.config.settings import resolve_project_path
 
     try:
@@ -285,7 +324,11 @@ async def write_code(request: WriteCodeRequest) -> FileWriteResponse:
     description="列出指定项目的所有文件"
 )
 async def list_files(app_id: int) -> Dict[str, Any]:
-    """列出项目文件"""
+    """
+    路由处理函数：接收请求参数并调用下游能力。
+    输入：Pydantic 模型或 query 参数；输出：JSON 或流式响应。
+    说明：包含异步/流式处理逻辑，需关注事件边界与错误兜底。
+    """
     from pathlib import Path
     from app.config.settings import get_project_path
 
@@ -297,7 +340,7 @@ async def list_files(app_id: int) -> Dict[str, Any]:
     files = []
     for file_path in project_path.rglob("*"):
         if file_path.is_file():
-            # 排除 node_modules
+            # 排除 node_modules，避免返回海量依赖文件
             if "node_modules" not in str(file_path):
                 rel_path = file_path.relative_to(project_path)
                 files.append(str(rel_path))
@@ -315,7 +358,11 @@ async def list_files(app_id: int) -> Dict[str, Any]:
     description="读取指定文件的内容"
 )
 async def read_file(app_id: int, file_path: str) -> Dict[str, Any]:
-    """读取文件内容"""
+    """
+    读取文件内容。
+
+    `resolve_project_path` 内部会做路径归一化和越界校验，避免 `../../` 路径穿越。
+    """
     from pathlib import Path
     from app.config.settings import get_project_path, resolve_project_path
 

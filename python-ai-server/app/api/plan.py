@@ -1,5 +1,6 @@
 """
-规划 API - 供 Java 侧调用
+模块职责：规划接口，接收需求后调用 Planner 生成执行计划。
+Java 对照：可类比“先规划再执行”的编排入口 Controller。
 """
 
 from fastapi import APIRouter, HTTPException
@@ -17,7 +18,10 @@ router = APIRouter(prefix="/api/v1/plan", tags=["plan"])
 # ==================== 请求模型 ====================
 
 class CreatePlanRequest(BaseModel):
-    """创建规划请求"""
+    """
+    CreatePlanRequest 请求 DTO：定义接口入参结构与校验约束。
+    Java 对照：可类比 Controller 入参对象（Request DTO）。
+    """
     requirement: str = Field(
         ...,
         description="用户需求描述",
@@ -141,7 +145,11 @@ async def create_plan(request: CreatePlanRequest) -> ProjectPlan:
 """
 )
 async def analyze_requirement(request: CreatePlanRequest) -> Dict[str, Any]:
-    """分析需求（返回简化的分析结果）"""
+    """
+    路由处理函数：接收请求参数并调用下游能力。
+    输入：Pydantic 模型或 query 参数；输出：JSON 或流式响应。
+    说明：包含异步/流式处理逻辑，需关注事件边界与错误兜底。
+    """
     planner = get_planner()
 
     try:

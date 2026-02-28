@@ -1,5 +1,11 @@
 """
-Code generation agent (single-file).
+单文件代码生成 Agent。
+
+执行链路（可类比 Java Service 编排）：
+1. 选择技能文档（skills）
+2. 选择并读取参考文件（src/**）
+3. 组装提示词并调用 LLM
+4. 写回目标文件
 """
 
 import json
@@ -18,10 +24,14 @@ from app.tools.file.listing import FileListTool
 from app.utils.file import ProjectFileSystem
 from app.agent.base_agent import CancelableAgent
 from app.utils.errors import AgentCancelledError
+from app.prompts.code_agent_prompts import (
+    build_file_selector_prompts,
+    build_single_file_user_prompt,
+)
 
 
 class CodeAgent(CancelableAgent):
-    """Generate and write a single file using LLM + skills."""
+    """使用 LLM + Skills 生成并写入单文件。"""
 
     def __init__(self):
         self.generator = get_generator()
@@ -37,6 +47,11 @@ class CodeAgent(CancelableAgent):
         file_list: Optional[List[str]] = None,
         task_id: Optional[str] = None,
     ) -> Dict[str, Any]:
+        """
+        Agent 阶段方法：用于组织生成流程中的一个步骤。
+        输入：当前任务上下文；输出：阶段结果或中间状态。
+        说明：包含异步/流式处理逻辑，需关注事件边界与错误兜底。
+        """
         if not file_path.replace("\\", "/").startswith("src/"):
             raise PermissionError("Only src/ is allowed for code generation")
         self._check_cancelled(task_id)
@@ -111,12 +126,18 @@ class CodeAgent(CancelableAgent):
         trace_id: Optional[str] = None,
         task_id: Optional[str] = None,
     ) -> AsyncGenerator[SseEvent, None]:
+        """
+        流式执行：通过 SSE 分阶段推送进度、代码片段和结果。
+
+        适合前端实时展示“正在生成中”的体验。
+        """
         if not file_path.replace("\\", "/").startswith("src/"):
             raise PermissionError("Only src/ is allowed for code generation")
 
         trace_id = trace_id or uuid.uuid4().hex
 
         def emit(event_type: SseEventType, data: Dict[str, Any]) -> SseEvent:
+            """统一封装 SSE 事件结构，避免每次手动填 trace/timestamp。"""
             return SseEvent(
                 trace_id=trace_id,
                 event_type=event_type,
@@ -322,12 +343,20 @@ class CodeAgent(CancelableAgent):
         file_list: Optional[List[str]],
         max_files: int = 200,
     ) -> List[str]:
+        """
+        收集“可读取的候选文件列表”。
+
+        优先级：
+        1) dependencies（最精确）
+        2) file_list（调用方给定）
+        3) 自动扫描 src/**
+        """
         if dependencies:
             return [p for p in dependencies if p.replace("\\", "/").startswith("src/")][:max_files]
         if file_list:
             return [p for p in file_list if p.replace("\\", "/").startswith("src/")][:max_files]
 
-        # Fallback: list src/** (limited)
+        # 兜底：扫描 src/**（受 max_files 限制，避免上下文过大）
         try:
             result = await FileListTool.run(app_id, patterns=["src/**"], limit=max_files)
             files = [f.get("path") for f in result.get("files", []) if f.get("path")]
@@ -344,23 +373,17 @@ class CodeAgent(CancelableAgent):
         llm_config: LlmConfig,
         max_files: int = 5,
     ) -> List[str]:
+        """让 LLM 从候选集中挑选“最值得读取”的少量文件。"""
         if not candidates:
             return []
 
         candidate_text = "\n".join(f"- {p}" for p in candidates[:200])
-        summary_text = f"\n\n## 规划摘要\n{plan_summary}" if plan_summary else ""
-
-        system_prompt = (
-            "你是文件选择器。请从候选文件中选择最需要阅读的文件，"
-            f"最多 {max_files} 个。只返回 JSON 数组。"
-            "如果不需要任何文件，返回空数组 []。"
-        )
-        user_prompt = (
-            f"## 目标文件\n{file_path}\n\n"
-            f"## 用户需求\n{requirement}"
-            f"{summary_text}\n\n"
-            "## 候选文件\n"
-            f"{candidate_text}"
+        system_prompt, user_prompt = build_file_selector_prompts(
+            requirement=requirement,
+            file_path=file_path,
+            plan_summary=plan_summary,
+            candidate_text=candidate_text,
+            max_files=max_files,
         )
 
         client = LlmClient(llm_config)
@@ -373,6 +396,7 @@ class CodeAgent(CancelableAgent):
             max_tokens=200,
         )
 
+        # 期望模型返回 JSON 数组，例如 ["src/api/user.ts", "src/views/Home.vue"]
         selected = self._parse_json_list(response)
         if not selected:
             return []
@@ -385,6 +409,10 @@ class CodeAgent(CancelableAgent):
         return filtered[:max_files]
 
     def _build_context(self, file_path: str, plan_summary: Optional[str]) -> str:
+        """
+        Agent 阶段方法：用于组织生成流程中的一个步骤。
+        输入：当前任务上下文；输出：阶段结果或中间状态。
+        """
         if plan_summary:
             return f"file_path: {file_path}\nplan_summary: {plan_summary}"
         return f"file_path: {file_path}"
@@ -396,23 +424,19 @@ class CodeAgent(CancelableAgent):
         plan_summary: Optional[str],
         snippets: List[Dict[str, Any]],
     ) -> str:
-        summary_text = f"\n\n## 规划摘要\n{plan_summary}" if plan_summary else ""
-        snippets_text = ""
-        if snippets:
-            parts = []
-            for item in snippets:
-                parts.append(f"### {item['path']}\n{item['content']}")
-            snippets_text = "\n\n## 参考文件\n" + "\n\n".join(parts)
-
-        return (
-            f"## 目标文件\n{file_path}\n\n"
-            f"## 用户需求\n{requirement}"
-            f"{summary_text}"
-            f"{snippets_text}\n\n"
-            "请直接输出目标文件的完整内容，不要输出解释。"
+        """
+        Agent 阶段方法：用于组织生成流程中的一个步骤。
+        输入：当前任务上下文；输出：阶段结果或中间状态。
+        """
+        return build_single_file_user_prompt(
+            file_path=file_path,
+            requirement=requirement,
+            plan_summary=plan_summary,
+            snippets=snippets,
         )
 
     def _strip_code_fence(self, text: str) -> str:
+        """去掉 ```lang ... ``` 包裹，得到纯代码文本。"""
         content = text.strip()
         if content.startswith("```"):
             # remove first fence line
@@ -422,6 +446,7 @@ class CodeAgent(CancelableAgent):
         return content.strip()
 
     def _parse_json_list(self, text: str) -> List[str]:
+        """容错解析模型输出的 JSON 列表（兼容 markdown code fence）。"""
         raw = text.strip()
         if raw.startswith("```json"):
             raw = raw[7:]

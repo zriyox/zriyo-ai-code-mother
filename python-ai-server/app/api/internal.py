@@ -23,7 +23,10 @@ router = APIRouter(
 # ==================== 请求模型 ====================
 
 class TokenCountRequest(BaseModel):
-    """Token 计数请求"""
+    """
+    TokenCountRequest 请求 DTO：定义接口入参结构与校验约束。
+    Java 对照：可类比 Controller 入参对象（Request DTO）。
+    """
     provider: str = Field(
         ...,
         description="LLM 提供商",
@@ -44,7 +47,10 @@ class TokenCountRequest(BaseModel):
 
 
 class MessagesCountRequest(BaseModel):
-    """消息列表 Token 计数请求"""
+    """
+    MessagesCountRequest 请求 DTO：定义接口入参结构与校验约束。
+    Java 对照：可类比 Controller 入参对象（Request DTO）。
+    """
     provider: str = Field(..., description="LLM 提供商")
     messages: List[Dict[str, str]] = Field(
         ...,
@@ -64,7 +70,10 @@ class MessagesCountRequest(BaseModel):
 
 
 class HealthCheckRequest(BaseModel):
-    """健康检查请求"""
+    """
+    HealthCheckRequest 请求 DTO：定义接口入参结构与校验约束。
+    Java 对照：可类比 Controller 入参对象（Request DTO）。
+    """
     services: Optional[List[str]] = Field(
         None,
         description="要检查的服务列表，如 ['llm', 'database', 'filesystem']"
@@ -72,14 +81,20 @@ class HealthCheckRequest(BaseModel):
 
 
 class TaskCancelRequest(BaseModel):
-    """任务取消请求"""
+    """
+    TaskCancelRequest 请求 DTO：定义接口入参结构与校验约束。
+    Java 对照：可类比 Controller 入参对象（Request DTO）。
+    """
     task_id: str = Field(..., description="任务 ID", min_length=1)
 
 
 # ==================== 响应模型 ====================
 
 class TokenCountResponse(BaseModel):
-    """Token 计数响应"""
+    """
+    TokenCountResponse 响应 DTO：定义接口出参结构。
+    Java 对照：可类比 Controller 返回对象（Response DTO）。
+    """
     token_count: int = Field(..., description="计算得到的 token 数量")
     provider: str = Field(..., description="请求的提供商")
     estimated: bool = Field(False, description="是否为估算值（非精确计算）")
@@ -87,7 +102,10 @@ class TokenCountResponse(BaseModel):
 
 
 class MessagesCountResponse(BaseModel):
-    """消息列表 Token 计数响应"""
+    """
+    MessagesCountResponse 响应 DTO：定义接口出参结构。
+    Java 对照：可类比 Controller 返回对象（Response DTO）。
+    """
     token_count: int = Field(..., description="计算得到的总 token 数量")
     message_count: int = Field(..., description="消息数量")
     provider: str = Field(..., description="请求的提供商")
@@ -95,14 +113,20 @@ class MessagesCountResponse(BaseModel):
 
 
 class PingResponse(BaseModel):
-    """Ping 响应"""
+    """
+    PingResponse 响应 DTO：定义接口出参结构。
+    Java 对照：可类比 Controller 返回对象（Response DTO）。
+    """
     pong: bool = Field(True, description="服务是否正常")
     timestamp: int = Field(..., description="当前时间戳（毫秒）")
     version: str = Field(..., description="服务版本")
 
 
 class HealthCheckResponse(BaseModel):
-    """健康检查响应"""
+    """
+    HealthCheckResponse 响应 DTO：定义接口出参结构。
+    Java 对照：可类比 Controller 返回对象（Response DTO）。
+    """
     status: str = Field(..., description="overall 状态: healthy, degraded, unhealthy")
     checks: Dict[str, Dict[str, Any]] = Field(
         default_factory=dict,
@@ -111,19 +135,28 @@ class HealthCheckResponse(BaseModel):
 
 
 class TaskCancelResponse(BaseModel):
-    """任务取消响应"""
+    """
+    TaskCancelResponse 响应 DTO：定义接口出参结构。
+    Java 对照：可类比 Controller 返回对象（Response DTO）。
+    """
     task_id: str = Field(..., description="任务 ID")
     cancelled: bool = Field(True, description="是否已标记取消")
 
 
 class ProvidersResponse(BaseModel):
-    """支持的提供商列表响应"""
+    """
+    ProvidersResponse 响应 DTO：定义接口出参结构。
+    Java 对照：可类比 Controller 返回对象（Response DTO）。
+    """
     providers: List[str] = Field(..., description="支持的提供商列表")
     count: int = Field(..., description="提供商数量")
 
 
 class ProviderInfoResponse(BaseModel):
-    """提供商信息响应"""
+    """
+    ProviderInfoResponse 响应 DTO：定义接口出参结构。
+    Java 对照：可类比 Controller 返回对象（Response DTO）。
+    """
     provider: str = Field(..., description="提供商名称")
     precision: str = Field(..., description="计算精度: exact, approximate, unknown")
     tokenizer: str = Field(..., description="使用的 tokenizer")
@@ -131,7 +164,10 @@ class ProviderInfoResponse(BaseModel):
 
 
 class ToolParam(BaseModel):
-    """工具参数描述"""
+    """
+    ToolParam 数据模型定义。
+    Java 对照：可类比 POJO/record，用于序列化与反序列化。
+    """
     name: str = Field(..., description="参数名")
     type: str = Field(..., description="类型")
     required: bool = Field(default=True, description="是否必填")
@@ -140,7 +176,10 @@ class ToolParam(BaseModel):
 
 
 class ToolInfo(BaseModel):
-    """工具信息"""
+    """
+    ToolInfo 数据模型定义。
+    Java 对照：可类比 POJO/record，用于序列化与反序列化。
+    """
     name: str = Field(..., description="工具名称")
     description: str = Field(..., description="工具描述")
     params: List[ToolParam] = Field(default_factory=list, description="参数列表")
@@ -149,7 +188,10 @@ class ToolInfo(BaseModel):
 
 
 class ToolsResponse(BaseModel):
-    """工具列表响应"""
+    """
+    ToolsResponse 响应 DTO：定义接口出参结构。
+    Java 对照：可类比 Controller 返回对象（Response DTO）。
+    """
     tools: List[ToolInfo] = Field(..., description="工具列表")
     count: int = Field(..., description="工具数量")
 
@@ -182,7 +224,11 @@ class ToolsResponse(BaseModel):
 **注意：** 不同 LLM 的 tokenizer 不同，计算结果可能有差异。
 """)
 async def count_tokens(request: TokenCountRequest) -> TokenCountResponse:
-    """计算文本的 token 数量"""
+    """
+    路由处理函数：接收请求参数并调用下游能力。
+    输入：Pydantic 模型或 query 参数；输出：JSON 或流式响应。
+    说明：包含异步/流式处理逻辑，需关注事件边界与错误兜底。
+    """
     try:
         token_count, estimated = await TokenCounter.count_tokens(
             request.text,
@@ -222,7 +268,11 @@ async def count_tokens(request: TokenCountRequest) -> TokenCountResponse:
 - 其他提供商: 计算所有文本 token 后加上估算的格式开销（约 5 tokens/消息）
 """)
 async def count_messages(request: MessagesCountRequest) -> MessagesCountResponse:
-    """计算消息列表的 token 数量"""
+    """
+    路由处理函数：接收请求参数并调用下游能力。
+    输入：Pydantic 模型或 query 参数；输出：JSON 或流式响应。
+    说明：包含异步/流式处理逻辑，需关注事件边界与错误兜底。
+    """
     try:
         token_count, estimated = await TokenCounter.count_messages(
             request.messages,
@@ -253,7 +303,11 @@ async def count_messages(request: MessagesCountRequest) -> MessagesCountResponse
     description="简单的 ping 端点，用于测试服务是否可用。"
 )
 async def ping() -> PingResponse:
-    """服务连通性测试"""
+    """
+    路由处理函数：接收请求参数并调用下游能力。
+    输入：Pydantic 模型或 query 参数；输出：JSON 或流式响应。
+    说明：包含异步/流式处理逻辑，需关注事件边界与错误兜底。
+    """
     import time
     return PingResponse(
         pong=True,
@@ -269,7 +323,12 @@ async def ping() -> PingResponse:
     description="返回所有支持的 LLM 提供商列表。"
 )
 async def get_providers() -> ProvidersResponse:
-    """获取支持的提供商列表"""
+    """
+    路由处理函数：接收请求参数并调用下游能力。
+    输入：Pydantic 模型或 query 参数；输出：JSON 或流式响应。
+    说明：包含异步/流式处理逻辑，需关注事件边界与错误兜底。
+    返回：目标对象实例或查询结果。
+    """
     providers = TokenCounter.get_supported_providers()
     return ProvidersResponse(
         providers=providers,
@@ -290,7 +349,12 @@ async def get_providers() -> ProvidersResponse:
 - `chars_per_token`: 每个 token 大约对应多少字符
 """)
 async def get_provider_info(provider: str) -> ProviderInfoResponse:
-    """获取提供商信息"""
+    """
+    路由处理函数：接收请求参数并调用下游能力。
+    输入：Pydantic 模型或 query 参数；输出：JSON 或流式响应。
+    说明：包含异步/流式处理逻辑，需关注事件边界与错误兜底。
+    返回：目标对象实例或查询结果。
+    """
     info = TokenCounter.get_provider_info(provider)
     return ProviderInfoResponse(**info)
 
@@ -302,7 +366,12 @@ async def get_provider_info(provider: str) -> ProviderInfoResponse:
     description="返回 Python 侧可用工具列表及参数说明，供 Java 侧做选择与授权。"
 )
 async def get_tools() -> ToolsResponse:
-    """获取工具列表"""
+    """
+    路由处理函数：接收请求参数并调用下游能力。
+    输入：Pydantic 模型或 query 参数；输出：JSON 或流式响应。
+    说明：包含异步/流式处理逻辑，需关注事件边界与错误兜底。
+    返回：目标对象实例或查询结果。
+    """
     tools = [
         ToolInfo(
             name="file_read",
@@ -409,7 +478,11 @@ async def get_tools() -> ToolsResponse:
 - `database`: 数据库连接（如有）
 """)
 async def health_check(request: HealthCheckRequest = HealthCheckRequest()) -> HealthCheckResponse:
-    """健康检查"""
+    """
+    路由处理函数：接收请求参数并调用下游能力。
+    输入：Pydantic 模型或 query 参数；输出：JSON 或流式响应。
+    说明：包含异步/流式处理逻辑，需关注事件边界与错误兜底。
+    """
     from pathlib import Path
     from app.config.settings import settings
 
@@ -450,6 +523,11 @@ async def health_check(request: HealthCheckRequest = HealthCheckRequest()) -> He
     description="标记任务取消，供执行端协作式中断。"
 )
 async def cancel_task(request: TaskCancelRequest) -> TaskCancelResponse:
+    """
+    路由处理函数：接收请求参数并调用下游能力。
+    输入：Pydantic 模型或 query 参数；输出：JSON 或流式响应。
+    说明：包含异步/流式处理逻辑，需关注事件边界与错误兜底。
+    """
     from app.utils.cancel import CancelRegistry
 
     CancelRegistry.request_cancel(request.task_id)

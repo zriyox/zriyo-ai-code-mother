@@ -1,5 +1,6 @@
 """
-LLM 客户端 - 统一调用不同提供商的 LLM（LangChain 版）
+模块职责：统一 LLM 访问适配层，屏蔽不同提供商 SDK 差异。
+Java 对照：可类比多实现 Client 的 Facade/Adapter。
 """
 
 from typing import List, Dict, Any, Iterator, AsyncIterator
@@ -9,7 +10,11 @@ from app.models.llm import LlmConfig, LlmMessage
 
 
 class LlmClient:
-    """LLM 客户端"""
+    """
+    LLM 客户端（适配层）。
+
+    作用：屏蔽不同提供商 SDK 差异，让上层统一用 `call/stream/astream`。
+    """
 
     def __init__(self, config: LlmConfig):
         """
@@ -77,6 +82,14 @@ class LlmClient:
             raise
 
     def _build_model(self, streaming: bool, **kwargs):
+        """
+        根据 provider 构建对应 LangChain ChatModel 实例。
+
+        当前策略：
+        - anthropic/claude -> `ChatAnthropic`
+        - gemini/google -> `ChatGoogleGenerativeAI`
+        - 其他默认走 OpenAI 兼容协议 -> `ChatOpenAI`
+        """
         provider = (self.config.provider or "").lower()
 
         temperature = kwargs.get("temperature", self.config.temperature)
@@ -139,6 +152,7 @@ class LlmClient:
             raise RuntimeError("langchain-openai 未安装，请运行: pip install langchain-openai")
 
     def _resolve_base_url(self, provider: str) -> str:
+        """解析不同 provider 的默认 base_url（可被 config.base_url 覆盖）。"""
         if self.config.base_url:
             return self.config.base_url
         if provider in ["ollama"]:
@@ -148,6 +162,7 @@ class LlmClient:
         return "https://api.openai.com/v1"
 
     def _to_langchain_messages(self, messages: List[LlmMessage]):
+        """将统一消息结构转换为 LangChain 的消息对象。"""
         try:
             from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
         except ImportError:

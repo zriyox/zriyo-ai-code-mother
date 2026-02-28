@@ -1,5 +1,6 @@
 """
-Agent 执行 API
+模块职责：Agent 执行相关 API 路由层，负责把请求转交给执行链路。
+Java 对照：可类比 Spring MVC Controller（参数校验 + 响应封装）。
 """
 
 from fastapi import APIRouter, Response

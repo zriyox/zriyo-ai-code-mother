@@ -10,6 +10,7 @@ from app.utils.errors import (
     FileOperationError,
     LLMError,
     ConfigurationError,
+    AgentCancelledError,
 )
 from app.utils.token_counter import TokenCounter, Provider, count_tokens, count_messages
 
@@ -25,6 +26,7 @@ __all__ = [
     "FileOperationError",
     "LLMError",
     "ConfigurationError",
+    "AgentCancelledError",
     # Token Counter
     "TokenCounter",
     "Provider",

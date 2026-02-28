@@ -16,9 +16,15 @@ class ProjectFileSystem:
         return get_project_path(app_id)
 
     @staticmethod
-    def resolve_path(app_id: int, file_path: str) -> Path:
-        """解析文件路径，防止路径穿越"""
-        return resolve_project_path(app_id, file_path)
+    def resolve_path(app_id: int, file_path: str, allowed_prefixes: Optional[list[str]] = None) -> Path:
+        """解析文件路径，防止路径穿越，可选限制子目录前缀"""
+        resolved = resolve_project_path(app_id, file_path)
+        if allowed_prefixes:
+            rel = resolved.relative_to(get_project_path(app_id))
+            rel_posix = rel.as_posix()
+            if not any(rel_posix == p.rstrip("/") or rel_posix.startswith(p.rstrip("/") + "/") for p in allowed_prefixes):
+                raise PermissionError(f"Path not allowed: {file_path}")
+        return resolved
 
     @staticmethod
     async def read_file(app_id: int, file_path: str) -> str:

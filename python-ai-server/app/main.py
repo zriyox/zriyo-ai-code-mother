@@ -14,6 +14,8 @@ import os
 from app.api.health import router as health_router
 from app.api.internal import router as internal_router
 from app.api.agent import router as agent_router
+from app.api.project import router as project_router
+from app.api.plan import router as plan_router
 from app.config.settings import settings
 from app.middleware.error_handlers import setup_error_handlers
 
@@ -52,6 +54,14 @@ TAGS_METADATA = [
     {
         "name": "health",
         "description": "健康检查接口，用于 K8s 探针",
+    },
+    {
+        "name": "project",
+        "description": "前端项目生成接口，支持脚手架创建和代码生成",
+    },
+    {
+        "name": "plan",
+        "description": "项目规划接口，分析需求生成执行计划",
     },
 ]
 
@@ -102,7 +112,9 @@ setup_error_handlers(app)
 # 注册路由
 app.include_router(health_router, tags=["health"])
 app.include_router(internal_router)  # 内部路由已包含 prefix
-app.include_router(agent_router, prefix="/api/v1")
+app.include_router(agent_router)
+app.include_router(project_router)
+app.include_router(plan_router)
 
 
 @app.get("/")
@@ -112,24 +124,6 @@ async def root():
         "service": "Python AI Server",
         "version": "0.1.0",
         "status": "running"
-    }
-
-
-@app.get("/health/live")
-async def liveness():
-    """K8s 存活探针"""
-    return {"status": "alive"}
-
-
-@app.get("/health/ready")
-async def readiness():
-    """K8s 就绪探针"""
-    return {
-        "status": "ready",
-        "checks": {
-            "database": "ok",
-            "filesystem": "ok"
-        }
     }
 
 

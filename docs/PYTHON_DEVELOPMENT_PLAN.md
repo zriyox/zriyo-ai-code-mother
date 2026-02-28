@@ -300,6 +300,24 @@ class AgentResult(BaseModel):
 
 ---
 
+### 4.4 前端生成与预览接口补充（规划）
+
+为支持“规划 → 生成 → 预览”闭环，新增前端生成相关接口，详细示例见：
+
+- `docs/API_SPEC_PLAN.md`
+
+核心接口（规划）：
+1. `POST /api/v1/plan/create`：生成项目规划
+2. `POST /api/v1/project/generate`：生成脚手架 + 自动按需读取 skills
+3. `POST /api/v1/project/code/generate`：生成单文件代码（或返回 system_prompt）
+4. `POST /api/v1/project/code/write`：写入文件
+5. `POST /api/v1/preview/run`：预览构建 + 运行时异常采集
+
+扩展字段：
+1. `skills`: 不再由 Java 传入，Python 侧自动按需匹配
+2. `baas`: 通用后端能力注入（首期 Supabase）
+
+
 ## 五、文件系统工具
 
 ### 5.1 项目文件系统

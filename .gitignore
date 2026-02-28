@@ -70,3 +70,5 @@ tmp/code_output/code_version/*
 
 # 排除 config 目录下的 node_modules
 tmp/code_output/config/node_modules/
+
+docs

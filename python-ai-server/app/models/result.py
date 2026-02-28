@@ -2,7 +2,7 @@
 结果模型定义
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Dict, Optional
 
 
@@ -13,10 +13,10 @@ class AgentResult(BaseModel):
     status: str                    # "success" | "failed"
 
     # 生成/修改的文件（通知 Java 记录）
-    files: List[Dict] = []         # [{"path": "...", "action": "created|modified"}]
+    files: List[Dict] = Field(default_factory=list)  # [{"path": "...", "action": "created|modified"}]
 
     # 其他结果
-    data: Dict = {}                # 根据任务类型不同而不同
+    data: Dict = Field(default_factory=dict)         # 根据任务类型不同而不同
     error: Optional[str] = None
 
     class Config:

@@ -91,17 +91,17 @@ class TokenCounter:
         provider = provider.lower()
 
         # OpenAI / Codex - 精确计算
-        if provider in [Provider.OPENAI, Provider.CODEX]:
+        if provider in [Provider.OPENAI.value, Provider.CODEX.value]:
             encoding = cls._get_tiktoken_encoding(model or "gpt-4")
             return len(encoding.encode(text)), False
 
         # Anthropic / Claude - 近似计算
-        elif provider in [Provider.ANTHROPIC, Provider.CLAUDE]:
+        elif provider in [Provider.ANTHROPIC.value, Provider.CLAUDE.value]:
             encoding = cls._get_tiktoken_encoding("cl100k_base")
             return len(encoding.encode(text)), True  # 近似
 
         # Google Gemini - 尝试精确，失败则估算
-        elif provider in [Provider.GEMINI, Provider.GOOGLE]:
+        elif provider in [Provider.GEMINI.value, Provider.GOOGLE.value]:
             try:
                 from google import genai
                 # 使用官方 SDK 计算（需要配置 API key）
@@ -113,7 +113,7 @@ class TokenCounter:
             return len(text) // 3, True
 
         # DeepSeek - 精确计算
-        elif provider == Provider.DEEPSEEK:
+        elif provider == Provider.DEEPSEEK.value:
             try:
                 tokenizer = cls._get_huggingface_tokenizer("deepseek-ai/deepseek-llm-7b-chat")
                 return len(tokenizer.encode(text)), False
@@ -124,7 +124,7 @@ class TokenCounter:
                 return (chinese_chars // 2) + (other_chars // 4), True
 
         # 通义千问 - 精确计算
-        elif provider in [Provider.QWEN, Provider.TONGYI]:
+        elif provider in [Provider.QWEN.value, Provider.TONGYI.value]:
             try:
                 tokenizer = cls._get_huggingface_tokenizer("Qwen/Qwen-7B-Chat")
                 return len(tokenizer.encode(text)), False
@@ -135,7 +135,7 @@ class TokenCounter:
                 return (chinese_chars // 2) + (other_chars // 4), True
 
         # 智谱 GLM - 精确计算
-        elif provider in [Provider.GLM, Provider.ZHIPU]:
+        elif provider in [Provider.GLM.value, Provider.ZHIPU.value]:
             try:
                 tokenizer = cls._get_huggingface_tokenizer("THUDM/glm-4-9b-chat")
                 return len(tokenizer.encode(text)), False
@@ -146,7 +146,7 @@ class TokenCounter:
                 return (chinese_chars // 2) + (other_chars // 4), True
 
         # 文心一言 ERNIE - 精确计算
-        elif provider in [Provider.ERNIE, Provider.BAIDU]:
+        elif provider in [Provider.ERNIE.value, Provider.BAIDU.value]:
             try:
                 tokenizer = cls._get_huggingface_tokenizer("nghuyong/ernie-2.0-base")
                 return len(tokenizer.encode(text)), False
@@ -157,7 +157,7 @@ class TokenCounter:
                 return (chinese_chars // 1.5) + (other_chars // 4), True
 
         # Kimi / Moonshot - 精确计算
-        elif provider in [Provider.KIMI, Provider.MOONSHOT]:
+        elif provider in [Provider.KIMI.value, Provider.MOONSHOT.value]:
             try:
                 tokenizer = cls._get_huggingface_tokenizer("moonshotai/Moonshot-7B")
                 return len(tokenizer.encode(text)), False
@@ -196,7 +196,7 @@ class TokenCounter:
         total = 0
 
         # OpenAI 系列的格式开销计算
-        if provider in [Provider.OPENAI, Provider.CODEX]:
+        if provider in [Provider.OPENAI.value, Provider.CODEX.value]:
             encoding = cls._get_tiktoken_encoding(model or "gpt-4")
             # 每条消息的格式开销
             total = len(messages) * 4
@@ -210,7 +210,7 @@ class TokenCounter:
             return total, False
 
         # Anthropic 系列的格式开销
-        elif provider in [Provider.ANTHROPIC, Provider.CLAUDE]:
+        elif provider in [Provider.ANTHROPIC.value, Provider.CLAUDE.value]:
             encoding = cls._get_tiktoken_encoding("cl100k_base")
             total = len(messages) * 4
             for msg in messages:
@@ -247,49 +247,49 @@ class TokenCounter:
 
         provider = provider.lower()
 
-        if provider in [Provider.OPENAI, Provider.CODEX]:
+        if provider in [Provider.OPENAI.value, Provider.CODEX.value]:
             info.update({
                 "precision": "exact",
                 "tokenizer": "tiktoken (cl100k_base)",
                 "chars_per_token": "~4 (English), ~2 (Chinese)"
             })
-        elif provider in [Provider.ANTHROPIC, Provider.CLAUDE]:
+        elif provider in [Provider.ANTHROPIC.value, Provider.CLAUDE.value]:
             info.update({
                 "precision": "approximate",
                 "tokenizer": "tiktoken (cl100k_base)",
                 "chars_per_token": "~4 (English), ~2 (Chinese)"
             })
-        elif provider in [Provider.GEMINI, Provider.GOOGLE]:
+        elif provider in [Provider.GEMINI.value, Provider.GOOGLE.value]:
             info.update({
                 "precision": "approximate",
                 "tokenizer": "SentencePiece",
                 "chars_per_token": "~3 (mixed)"
             })
-        elif provider == Provider.DEEPSEEK:
+        elif provider == Provider.DEEPSEEK.value:
             info.update({
                 "precision": "exact (with HF)",
                 "tokenizer": "HuggingFace (BPE)",
                 "chars_per_token": "~2 (Chinese), ~4 (English)"
             })
-        elif provider in [Provider.QWEN, Provider.TONGYI]:
+        elif provider in [Provider.QWEN.value, Provider.TONGYI.value]:
             info.update({
                 "precision": "exact (with HF)",
                 "tokenizer": "HuggingFace (Qwen)",
                 "chars_per_token": "~1.5-2 (Chinese)"
             })
-        elif provider in [Provider.GLM, Provider.ZHIPU]:
+        elif provider in [Provider.GLM.value, Provider.ZHIPU.value]:
             info.update({
                 "precision": "exact (with HF)",
                 "tokenizer": "HuggingFace (GLM)",
                 "chars_per_token": "~1.5-2 (Chinese)"
             })
-        elif provider in [Provider.ERNIE, Provider.BAIDU]:
+        elif provider in [Provider.ERNIE.value, Provider.BAIDU.value]:
             info.update({
                 "precision": "exact (with HF)",
                 "tokenizer": "HuggingFace (ERNIE)",
                 "chars_per_token": "~1.5 (Chinese)"
             })
-        elif provider in [Provider.KIMI, Provider.MOONSHOT]:
+        elif provider in [Provider.KIMI.value, Provider.MOONSHOT.value]:
             info.update({
                 "precision": "exact (with HF)",
                 "tokenizer": "HuggingFace (Moonshot)",

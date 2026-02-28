@@ -71,6 +71,11 @@ class HealthCheckRequest(BaseModel):
     )
 
 
+class TaskCancelRequest(BaseModel):
+    """任务取消请求"""
+    task_id: str = Field(..., description="任务 ID", min_length=1)
+
+
 # ==================== 响应模型 ====================
 
 class TokenCountResponse(BaseModel):
@@ -105,6 +110,12 @@ class HealthCheckResponse(BaseModel):
     )
 
 
+class TaskCancelResponse(BaseModel):
+    """任务取消响应"""
+    task_id: str = Field(..., description="任务 ID")
+    cancelled: bool = Field(True, description="是否已标记取消")
+
+
 class ProvidersResponse(BaseModel):
     """支持的提供商列表响应"""
     providers: List[str] = Field(..., description="支持的提供商列表")
@@ -117,6 +128,30 @@ class ProviderInfoResponse(BaseModel):
     precision: str = Field(..., description="计算精度: exact, approximate, unknown")
     tokenizer: str = Field(..., description="使用的 tokenizer")
     chars_per_token: str = Field(..., description="每 token 平均字符数说明")
+
+
+class ToolParam(BaseModel):
+    """工具参数描述"""
+    name: str = Field(..., description="参数名")
+    type: str = Field(..., description="类型")
+    required: bool = Field(default=True, description="是否必填")
+    description: str = Field(..., description="参数说明")
+    default: Optional[str] = Field(default=None, description="默认值")
+
+
+class ToolInfo(BaseModel):
+    """工具信息"""
+    name: str = Field(..., description="工具名称")
+    description: str = Field(..., description="工具描述")
+    params: List[ToolParam] = Field(default_factory=list, description="参数列表")
+    requires: Dict[str, Any] = Field(default_factory=dict, description="依赖要求")
+    version: str = Field(default="v1", description="工具版本")
+
+
+class ToolsResponse(BaseModel):
+    """工具列表响应"""
+    tools: List[ToolInfo] = Field(..., description="工具列表")
+    count: int = Field(..., description="工具数量")
 
 
 # ==================== API 端点 ====================
@@ -260,6 +295,107 @@ async def get_provider_info(provider: str) -> ProviderInfoResponse:
     return ProviderInfoResponse(**info)
 
 
+@router.get(
+    "/tools",
+    response_model=ToolsResponse,
+    summary="获取工具列表",
+    description="返回 Python 侧可用工具列表及参数说明，供 Java 侧做选择与授权。"
+)
+async def get_tools() -> ToolsResponse:
+    """获取工具列表"""
+    tools = [
+        ToolInfo(
+            name="file_read",
+            description="读取文件内容（支持行范围）",
+            params=[
+                ToolParam(name="app_id", type="int", description="应用 ID"),
+                ToolParam(name="file_path", type="string", description="文件路径"),
+                ToolParam(
+                    name="allowed_prefixes",
+                    type="array[string]",
+                    required=False,
+                    description="允许访问的子目录前缀（默认 [\"src\"]）",
+                ),
+                ToolParam(name="start_line", type="int", required=False, description="起始行（1-based）"),
+                ToolParam(name="end_line", type="int", required=False, description="结束行（1-based）"),
+                ToolParam(name="max_chars", type="int", required=False, description="最大字符数"),
+            ],
+        ),
+        ToolInfo(
+            name="file_list",
+            description="列出项目文件（支持 glob/pathspec）",
+            params=[
+                ToolParam(name="app_id", type="int", description="应用 ID"),
+                ToolParam(
+                    name="patterns",
+                    type="array[string]",
+                    required=False,
+                    description="路径匹配模式列表，默认为 **/*",
+                ),
+                ToolParam(
+                    name="allowed_prefixes",
+                    type="array[string]",
+                    required=False,
+                    description="允许访问的子目录前缀（默认 [\"src\"]）",
+                ),
+                ToolParam(name="limit", type="int", required=False, description="最大返回数量"),
+            ],
+        ),
+        ToolInfo(
+            name="file_search",
+            description="全文搜索（基于 ripgrep）",
+            params=[
+                ToolParam(name="app_id", type="int", description="应用 ID"),
+                ToolParam(name="query", type="string", description="搜索关键词"),
+                ToolParam(
+                    name="patterns",
+                    type="array[string]",
+                    required=False,
+                    description="glob 过滤规则",
+                ),
+                ToolParam(
+                    name="allowed_prefixes",
+                    type="array[string]",
+                    required=False,
+                    description="允许访问的子目录前缀（默认 [\"src\"]）",
+                ),
+                ToolParam(name="max_results", type="int", required=False, description="最大返回条数"),
+                ToolParam(name="case_sensitive", type="bool", required=False, description="是否区分大小写"),
+                ToolParam(name="context_lines", type="int", required=False, description="上下文行数"),
+            ],
+            requires={"external_binaries": ["rg"]},
+        ),
+        ToolInfo(
+            name="file_patch",
+            description="增量写入（应用 unified diff）",
+            params=[
+                ToolParam(name="app_id", type="int", description="应用 ID"),
+                ToolParam(name="patch_text", type="string", description="diff 内容"),
+                ToolParam(
+                    name="allowed_prefixes",
+                    type="array[string]",
+                    required=False,
+                    description="允许访问的子目录前缀（默认 [\"src\"]）",
+                ),
+            ],
+            requires={"python_packages": ["unidiff"]},
+        ),
+        ToolInfo(
+            name="skill_read",
+            description="读取 Skill 文档（仅限 skills/codeagent/）",
+            params=[
+                ToolParam(
+                    name="skill_path",
+                    type="string",
+                    description="技能路径或名称（相对 skills/codeagent/，如 code/element-plus 或 code/element-plus/SKILL.md）",
+                )
+            ],
+        ),
+    ]
+
+    return ToolsResponse(tools=tools, count=len(tools))
+
+
 @router.post(
     "/health",
     response_model=HealthCheckResponse,
@@ -305,3 +441,16 @@ async def health_check(request: HealthCheckRequest = HealthCheckRequest()) -> He
         status=overall_status,
         checks=checks
     )
+
+
+@router.post(
+    "/task/cancel",
+    response_model=TaskCancelResponse,
+    summary="取消任务（内部）",
+    description="标记任务取消，供执行端协作式中断。"
+)
+async def cancel_task(request: TaskCancelRequest) -> TaskCancelResponse:
+    from app.utils.cancel import CancelRegistry
+
+    CancelRegistry.request_cancel(request.task_id)
+    return TaskCancelResponse(task_id=request.task_id, cancelled=True)

@@ -49,6 +49,14 @@ sa-token:
   # 默认使用内存存储
   dao: cn.dev33.satoken.dao.SaTokenDaoOfInMemory
   active-timeout: 1800
+  # 额外排除路径（可在此追加）
+  exclude-paths:
+    - /auth/login
+    - /auth/register
+    - /captcha/**
+    - /health
+    - /actuator/**
+    - /error
 
 # Actuator 监控配置
 management:
@@ -63,6 +71,8 @@ management:
 # Python 服务配置
 python:
   port: 8000
+  # 如需自定义 Python 服务地址，可配置该项
+  # base-url: http://127.0.0.1:8000
   path: ../python-ai-server
   enabled: true
   auto-start: true

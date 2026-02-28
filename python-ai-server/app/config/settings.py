@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     # 项目共享目录
     PROJECT_BASE: str = "/app/projects"
 
+    # 前端脚手架路径
+    FRONTEND_SCAFFOLD_PATH: str = ""
+
     # 服务端口
     PORT: int = 8000
 
@@ -39,7 +42,10 @@ settings = Settings()
 def get_project_path(app_id: int) -> Path:
     """获取项目根目录"""
     base = Path(settings.PROJECT_BASE)
-    return base / f"app_{app_id:06d}"
+    if not base.is_absolute():
+        repo_root = Path(__file__).resolve().parents[3]
+        base = (repo_root / base).resolve()
+    return base / f"{app_id}"
 
 
 def resolve_project_path(app_id: int, file_path: str) -> Path:

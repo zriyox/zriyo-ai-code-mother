@@ -11,8 +11,11 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Configuration
 @Slf4j
@@ -29,21 +32,26 @@ public class SaTokenConfigure implements WebMvcConfigurer {
         List<String> excludePaths = saTokenProperties.getExcludePaths();
 
         // 添加默认的排除路径
-        List<String> defaultExcludes = Arrays.asList(
+        List<String> defaultExcludes = new ArrayList<>(Arrays.asList(
                 "/auth/login",
                 "/auth/register",
                 "/captcha/**",
                 "/health",
                 "/actuator/**",
                 "/error"
-        );
+        ));
 
         // 合并配置的排除路径和默认排除路径
-        defaultExcludes.addAll(excludePaths);
+        if (excludePaths != null && !excludePaths.isEmpty()) {
+            defaultExcludes.addAll(excludePaths);
+        }
+
+        // 去重并保持顺序
+        Set<String> deduped = new LinkedHashSet<>(defaultExcludes);
 
         registry.addInterceptor(new SaInterceptor(handle -> StpUtil.checkLogin()))
                 .addPathPatterns("/**")
-                .excludePathPatterns(defaultExcludes.toArray(new String[0]));
+                .excludePathPatterns(deduped.toArray(new String[0]));
     }
 
     @Bean

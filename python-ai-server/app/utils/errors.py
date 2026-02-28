@@ -36,3 +36,9 @@ class ConfigurationError(AgentError):
     """配置异常"""
     def __init__(self, message: str):
         super().__init__(message, "CONFIGURATION_ERROR")
+
+
+class AgentCancelledError(AgentError):
+    """Agent 取消异常"""
+    def __init__(self, message: str = "Request cancelled"):
+        super().__init__(message, "AGENT_CANCELLED")

@@ -244,4 +244,131 @@ CREATE TABLE `user_sign_in` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='用户签到历史记录（逻辑外键，支持连续签到）';
 
+-- ----------------------------
+-- Table structure for workflow_def
+-- ----------------------------
+DROP TABLE IF EXISTS `workflow_def`;
+CREATE TABLE `workflow_def` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `workflow_id` varchar(64) NOT NULL COMMENT '工作流标识',
+  `version` int NOT NULL DEFAULT '1' COMMENT '版本号',
+  `name` varchar(128) NOT NULL COMMENT '名称',
+  `spec_json` json NOT NULL COMMENT 'WorkflowSpec JSON',
+  `enabled` tinyint NOT NULL DEFAULT '1' COMMENT '是否启用',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_workflow_version` (`workflow_id`,`version`),
+  KEY `idx_workflow_id` (`workflow_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='工作流定义';
+
+-- ----------------------------
+-- Table structure for project_session
+-- ----------------------------
+DROP TABLE IF EXISTS `project_session`;
+CREATE TABLE `project_session` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `app_id` bigint NOT NULL COMMENT '应用 ID',
+  `title` varchar(128) DEFAULT NULL COMMENT '项目标题',
+  `description` text COMMENT '项目描述',
+  `conversation_summary` mediumtext COMMENT '对话摘要',
+  `project_structure` json COMMENT '项目结构摘要',
+  `active_plan_id` varchar(64) DEFAULT NULL COMMENT '当前生效计划',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_app_id` (`app_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='项目会话';
+
+-- ----------------------------
+-- Table structure for plan
+-- ----------------------------
+DROP TABLE IF EXISTS `plan`;
+CREATE TABLE `plan` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `plan_id` varchar(64) NOT NULL COMMENT '计划 ID',
+  `app_id` bigint NOT NULL COMMENT '应用 ID',
+  `workflow_id` varchar(64) NOT NULL COMMENT '工作流标识',
+  `status` varchar(32) NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE/ARCHIVED',
+  `parent_plan_id` varchar(64) DEFAULT NULL COMMENT '上一份计划 ID',
+  `source` varchar(32) DEFAULT NULL COMMENT 'auto/user',
+  `human_plan_md` mediumtext COMMENT 'Plan A（Markdown）',
+  `exec_plan_json` json COMMENT 'Plan B（执行计划 JSON）',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_plan_id` (`plan_id`),
+  KEY `idx_app_id` (`app_id`),
+  KEY `idx_workflow_id` (`workflow_id`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='计划';
+
+-- ----------------------------
+-- Table structure for plan_step
+-- ----------------------------
+DROP TABLE IF EXISTS `plan_step`;
+CREATE TABLE `plan_step` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `plan_id` varchar(64) NOT NULL COMMENT '计划 ID',
+  `step_id` varchar(32) NOT NULL COMMENT '步骤 ID（S1/S2）',
+  `title` varchar(256) DEFAULT NULL COMMENT '步骤标题',
+  `status` varchar(32) NOT NULL DEFAULT 'pending' COMMENT 'pending/in_progress/completed/failed',
+  `sort_order` int NOT NULL DEFAULT '0' COMMENT '排序',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_plan_step` (`plan_id`,`step_id`),
+  KEY `idx_plan_id` (`plan_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='计划步骤';
+
+-- ----------------------------
+-- Table structure for task
+-- ----------------------------
+DROP TABLE IF EXISTS `task`;
+CREATE TABLE `task` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `task_id` varchar(64) NOT NULL COMMENT '任务 ID',
+  `app_id` bigint NOT NULL COMMENT '应用 ID',
+  `workflow_id` varchar(64) NOT NULL COMMENT '工作流标识',
+  `status` varchar(32) NOT NULL COMMENT '任务状态',
+  `stage` varchar(64) DEFAULT NULL COMMENT '当前阶段',
+  `attempt` int NOT NULL DEFAULT '0' COMMENT '当前尝试次数',
+  `max_attempt` int NOT NULL DEFAULT '0' COMMENT '最大重试次数',
+  `retry_count` int NOT NULL DEFAULT '0' COMMENT '已重试次数',
+  `next_retry_at` datetime DEFAULT NULL COMMENT '下次重试时间',
+  `last_error` text COMMENT '最近错误',
+  `trace_id` varchar(64) DEFAULT NULL COMMENT '追踪 ID',
+  `payload_json` json COMMENT '输入参数',
+  `result_json` json COMMENT '输出结果',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `started_at` datetime DEFAULT NULL COMMENT '开始时间',
+  `finished_at` datetime DEFAULT NULL COMMENT '结束时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_task_id` (`task_id`),
+  KEY `idx_app_id` (`app_id`),
+  KEY `idx_status` (`status`),
+  KEY `idx_workflow` (`workflow_id`),
+  KEY `idx_updated_at` (`updated_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='任务';
+
+-- ----------------------------
+-- Table structure for task_event
+-- ----------------------------
+DROP TABLE IF EXISTS `task_event`;
+CREATE TABLE `task_event` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `task_id` varchar(64) NOT NULL COMMENT '任务 ID',
+  `event_type` varchar(64) NOT NULL COMMENT '事件类型',
+  `stage` varchar(64) DEFAULT NULL COMMENT '关联阶段',
+  `status_from` varchar(32) DEFAULT NULL COMMENT '原状态',
+  `status_to` varchar(32) DEFAULT NULL COMMENT '新状态',
+  `attempt` int NOT NULL DEFAULT '0' COMMENT '尝试次数',
+  `message` varchar(512) DEFAULT NULL COMMENT '描述',
+  `data_json` json COMMENT '事件数据',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_task_id` (`task_id`),
+  KEY `idx_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='任务事件';
+
 SET FOREIGN_KEY_CHECKS = 1;

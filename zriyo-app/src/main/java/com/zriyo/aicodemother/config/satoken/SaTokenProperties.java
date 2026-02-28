@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Component
-@ConfigurationProperties(prefix = "satoken")
+@ConfigurationProperties(prefix = "sa-token")
 public class SaTokenProperties {
 
     private List<String> excludePaths = new ArrayList<>();

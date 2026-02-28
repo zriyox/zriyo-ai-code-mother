@@ -8,7 +8,7 @@
 | v2.0 | 2025-02-14 | Claude | 通用 Agent 架构 + Python 无状态设计 |
 | v2.1 | 2025-02-14 | Claude | 整合版：Python 技术栈 + 错误处理策略 |
 | v2.2 | 2025-02-14 | Claude | 新增：Java 侧 Agent 编排 + 全新上下文管理 |
-| v2.3 | 2025-02-14 | Claude | **JoyAgent 参考集成**：Java 75% 编排 + Python 25% 工具服务，**无需 LangChain** |
+| v2.3 | 2025-02-14 | Claude | Java 75% 编排 + Python 25% 工具服务|
 
 ---
 
@@ -21,6 +21,23 @@
 - **文档分析** (DOCX、PDF、Excel)
 - **数据可视化** (图表绘制)
 - **BaaS 数据存储** (为生成的前端应用提供后端能力)
+- **在浏览器插件场景下，实时记录视频内容并生成 Markdown 笔记，支持随时提问与手动记笔记。**
+- **支持对网页实时抓取总结 md 笔记提问、生成笔记**
+
+### 1.2 新增能力规划：视频笔记与问答
+
+目标：在浏览器插件场景下，实时记录视频内容并生成 Markdown 笔记，支持随时提问与手动记笔记。
+
+范围（MVP）
+1. **内容采集**：优先基于字幕/文稿分片（含时间戳）上报
+2. **增量总结**：Python 无状态处理分片，输出笔记块（Markdown）
+3. **即时问答**：基于已生成笔记与分片内容进行检索与问答
+4. **手动笔记**：用户可随时追加个人备注并合并到笔记
+5. **数据存储**：笔记块与最终笔记持久化（便于检索/导出）
+
+事件与协议（建议）
+1. `session_start` / `chunk_ingest` / `note_chunk` / `note_finalize`
+2. 笔记块数据结构：`{id, t_start, t_end, md, tags, refs}`
 
 ### 1.1.1 JoyAgent 参考架构
 
@@ -41,7 +58,7 @@
 │  │  - Agent 循环 (Think → Act → Observe)│       │  - 数据分析             ││
 │  │  - LLM 直接调用 (~200 行封装)       │         │  - 知识检索             ││
 │  │                                     │         │                         ││
-│  │  ❌ 不使用 LangChain4j              │         │  ❌ 不使用 LangChain    ││
+│  │  ❌ 不依赖 LangChain4j              │         │  ✅ 使用 LangChain      ││
 │  └─────────────────────────────────────┘         └─────────────────────────┘│
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -49,7 +66,7 @@
 **关键设计决策**：
 | 决策点 | JoyAgent 模式 | 说明 |
 |--------|---------------|------|
-| **LangChain 使用** | ❌ 不使用 | JoyAgent 实践证明：直接调用 LLM API 仅需 ~200 行封装代码 |
+| **LangChain 使用** | Java 侧不依赖 LangChain4j；Python 侧使用 LangChain | Python 侧统一 OpenAI 兼容调用，Java 侧编排为主 |
 | **Agent 编排位置** | ✅ Java 侧 | 意图识别、任务路由、Agent 循环、决策全部在 Java |
 | **Python 角色** | 🔧 工具服务 | Python 只作为无状态 Tool 服务，通过 REST API 暴露能力 |
 | **通信协议** | HTTP + SSE | Java POST 到 Python，Python SSE 流式返回结果 |
@@ -220,7 +237,7 @@
 │  │  │  - 流式响应处理             │   │         │                         ││
 │  │  └─────────────────────────────┘   │         │                         ││
 │  │                                     │         │                         ││
-│  │  ❌ 不使用 LangChain4j             │         │  ❌ 不使用 LangChain    ││
+│  │  ❌ 不依赖 LangChain4j             │         │  ✅ 使用 LangChain      ││
 │  └─────────────────────────────────────┘         └─────────────────────────┘│
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -403,6 +420,29 @@ public enum IntentType {
 ```
 
 ### 4.3 规划 Agent 设计
+
+#### 4.3.0 双计划模型（Plan A / Plan B）
+
+设计目标：既满足用户可读性，又满足系统可执行性。
+
+PlanGate（是否需要规划）
+1. 小改动（1-2 文件、无新依赖/路由）可跳过规划
+2. 大改动（新增模块/页面/依赖/路由）必须先规划
+
+Plan A（Human Plan）
+1. Markdown 格式，适合直接展示给用户
+2. 可通过 SSE 流式输出（plan_chunk）
+3. 步骤必须包含 `step_id`
+
+Plan B（Exec Plan）
+1. 结构化 JSON（files / dependencies / execution_order / checks）
+2. 与 Plan A 共享 `step_id`
+3. Java 侧持久化并驱动执行
+
+Plan 状态推进
+1. Java 侧维护 `step_status`（pending/in_progress/completed）
+2. 通过 SSE 事件 `plan_step_update` 实时同步到前端
+3. 前端渲染时叠加状态徽标（不修改原 Markdown）
 
 #### 4.3.1 执行计划结构
 
@@ -1582,6 +1622,27 @@ src/main/java/com/zriyo/aicodemother/service/skill/
 ```
 
 ### 6.8 Python 侧 Skill 执行
+
+### 6.9 Skill 目录规范（按 Agent 分区）
+
+为实现 Claude/Codex 风格的“Agent 自读 Skill”，统一目录结构：
+
+```
+skills/
+└── codeagent/
+    ├── SYSTEM.md
+    ├── SKILLS_INDEX.md
+    └── code/
+        └── <skill>/SKILL.md
+```
+
+读取规则：
+1. 必读 `skills/codeagent/SYSTEM.md`
+2. 必读 `skills/codeagent/SKILLS_INDEX.md`
+3. 仅按当前 Agent 读取对应分区
+   - CodeAgent → `skills/codeagent/code/**`
+4. 忽略 YAML front‑matter，仅使用正文
+5. 未找到技能则返回“缺少技能”并停止生成
 
 ```
 python-ai-server/app/
@@ -4764,6 +4825,24 @@ public class BaseEvent {
 
 ---
 
+### 12.4 前端生成与预览接口补充（规划）
+
+为了支持“规划 → 生成 → 预览”闭环，新增前端生成相关接口约定，详细示例见：
+
+- `docs/API_SPEC_PLAN.md`
+
+核心接口（规划）：
+1. `POST /api/v1/plan/create`：生成项目规划
+2. `POST /api/v1/project/generate`：生成脚手架 + 自动按需读取 skills
+3. `POST /api/v1/project/code/generate`：生成单文件代码（或返回 system_prompt）
+4. `POST /api/v1/project/code/write`：写入文件
+5. `POST /api/v1/preview/run`：预览构建 + 运行时异常采集
+
+扩展字段：
+1. `skills`: 不再由 Java 传入，Python 侧自动按需匹配
+2. `baas`: 通用后端能力注入（首期 Supabase）
+
+
 ## 十七、数据库设计
 
 ### 13.1 Java 侧表 (现有)
@@ -5344,6 +5423,23 @@ python-ai-server/
 ---
 
 ## 附录：术语表
+
+---
+
+## 附录：会话记忆与总结规则
+
+为避免长对话导致上下文丢失，约定以下记录规则：
+
+1. 当上下文剩余约 30% 时，将关键操作/决策/待办写入：
+   - `docs/SESSION_MEMORY.md`
+2. 写入格式参考：
+   - `docs/PROJECT_SUMMARY.md`
+
+写入内容范围：
+- 已完成的关键任务
+- 重要决策与约定
+- 待办事项与下一步
+- 影响后续对话的关键信息
 
 | 术语 | 说明 |
 |--------|------|

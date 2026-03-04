@@ -8,12 +8,13 @@ Python AI Server - FastAPI 入口
 """
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 import os
+import uuid
 
 from app.api.health import router as health_router
 from app.api.internal import router as internal_router
@@ -61,7 +62,7 @@ TAGS_METADATA = [
     },
     {
         "name": "project",
-        "description": "前端项目生成接口，支持脚手架创建和代码生成",
+        "description": "项目代码接口，支持代码生成与文件读写（初始化由 Java 侧负责）",
     },
     {
         "name": "plan",
@@ -77,15 +78,19 @@ async def lifespan(app: FastAPI):
     Java 对照：类似 @PostConstruct / @PreDestroy 的组合。
     """
     from loguru import logger
+    from app.utils.cancel import CancelService
 
     # 启动时执行
     logger.info(f"Python AI Server starting on port {settings.PORT}")
     logger.info(f"Project base path: {settings.PROJECT_BASE}")
     logger.info(f"Debug mode: {os.getenv('DEBUG', 'false')}")
+    await CancelService.ensure_ready()
+    logger.info(f"Cancel backend: {CancelService.backend_name()}")
 
     yield
 
     # 关闭时执行
+    await CancelService.shutdown()
     logger.info("Python AI Server shutting down")
 
 
@@ -111,6 +116,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def trace_context_middleware(request: Request, call_next):
+    """
+    链路追踪中间件：接收上游 trace_id，缺失则自动生成，并回写到响应头。
+    """
+    trace_id = request.headers.get("X-Trace-Id") or request.headers.get("x-trace-id")
+    if not trace_id:
+        trace_id = uuid.uuid4().hex
+
+    request.state.trace_id = trace_id
+    response = await call_next(request)
+    response.headers["X-Trace-Id"] = trace_id
+    return response
 
 # 注册异常处理器
 setup_error_handlers(app)

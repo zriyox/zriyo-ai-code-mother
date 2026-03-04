@@ -3,7 +3,7 @@
 """
 
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 from app.config.settings import settings, get_project_path, resolve_project_path
 
 
@@ -27,17 +27,26 @@ class ProjectFileSystem:
         return resolved
 
     @staticmethod
-    async def read_file(app_id: int, file_path: str) -> str:
+    async def read_file(
+        app_id: int,
+        file_path: str,
+        allowed_prefixes: Optional[list[str]] = None,
+    ) -> str:
         """读取文件"""
-        path = ProjectFileSystem.resolve_path(app_id, file_path)
+        path = ProjectFileSystem.resolve_path(app_id, file_path, allowed_prefixes=allowed_prefixes)
         if not path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
         return path.read_text(encoding="utf-8")
 
     @staticmethod
-    async def write_file(app_id: int, file_path: str, content: str):
+    async def write_file(
+        app_id: int,
+        file_path: str,
+        content: str,
+        allowed_prefixes: Optional[list[str]] = None,
+    ):
         """写入文件"""
-        path = ProjectFileSystem.resolve_path(app_id, file_path)
+        path = ProjectFileSystem.resolve_path(app_id, file_path, allowed_prefixes=allowed_prefixes)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
 

@@ -17,6 +17,8 @@ class Settings(BaseSettings):
 
     # 项目共享目录
     PROJECT_BASE: str = "/app/projects"
+    # 项目目录命名规则（与 Java project.dir-pattern 对齐）
+    PROJECT_DIR_PATTERN: str = "app_%06d"
 
     # 前端脚手架路径
     FRONTEND_SCAFFOLD_PATH: str = ""
@@ -29,6 +31,12 @@ class Settings(BaseSettings):
 
     # Python 服务地址
     PYTHON_BASE_URL: str = "http://localhost:8000"
+
+    # 取消能力后端配置：memory / redis
+    CANCEL_BACKEND: str = "memory"
+    REDIS_URL: Optional[str] = None
+    CANCEL_KEY_PREFIX: str = "agent:cancel:"
+    CANCEL_TTL_SECONDS: int = 3600
 
     class Config:
         env_file = ".env"
@@ -45,7 +53,32 @@ def get_project_path(app_id: int) -> Path:
     if not base.is_absolute():
         repo_root = Path(__file__).resolve().parents[3]
         base = (repo_root / base).resolve()
-    return base / f"{app_id}"
+
+    # 首选新规则（与 Java 默认 app_%06d 对齐），兼容旧规则（纯数字目录）
+    candidates = []
+    pattern = (settings.PROJECT_DIR_PATTERN or "").strip()
+    if pattern:
+        try:
+            if "%" in pattern:
+                candidates.append(base / (pattern % app_id))
+            elif "{app_id" in pattern:
+                candidates.append(base / pattern.format(app_id=app_id))
+            else:
+                candidates.append(base / pattern)
+        except Exception:
+            # pattern 配置非法时回退 legacy
+            pass
+
+    legacy = base / f"{app_id}"
+    if legacy not in candidates:
+        candidates.append(legacy)
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+
+    # 不存在时优先使用首选规则，便于首次写入路径与 Java 保持一致
+    return candidates[0] if candidates else legacy
 
 
 def resolve_project_path(app_id: int, file_path: str) -> Path:

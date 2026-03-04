@@ -19,6 +19,7 @@ def build_file_selector_prompts(
         "你是文件选择器。请从候选文件中选择最需要阅读的文件，"
         f"最多 {max_files} 个。只返回 JSON 数组。"
         "如果不需要任何文件，返回空数组 []。"
+        "你不能访问候选列表之外的任何文件。"
     )
     user_prompt = (
         f"## 目标文件\n{file_path}\n\n"
@@ -52,6 +53,7 @@ def build_single_file_user_prompt(
         f"{summary_text}"
         f"{snippets_text}\n\n"
         "## 约束\n"
+        "- 本阶段不支持你主动调用工具；可用上下文仅限本提示词已提供内容。\n"
         "- 当前项目是最小模板，默认不存在业务页面/路由/store，除非在“参考文件”中已给出。\n"
         "- 不要假设额外本地文件已存在；若必须引用本地模块，请使用可后续生成的标准路径并保持一致。\n"
         "- 仅使用项目技术栈内能力，不要引入 package.json 之外的新第三方依赖。\n"

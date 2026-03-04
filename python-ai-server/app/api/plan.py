@@ -5,7 +5,7 @@ Java 对照：可类比“先规划再执行”的编排入口 Controller。
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 from app.agent.planner import get_planner
 from app.models.plan import ProjectPlan
@@ -45,6 +45,9 @@ class CreatePlanRequest(BaseModel):
         ...,
         description="LLM 配置"
     )
+    task_id: Optional[str] = Field(default=None, description="任务 ID（可选，用于取消）")
+    allowed_capabilities: Optional[List[str]] = Field(default=None, description="编排侧下发的 capability 白名单（可选）")
+    capability_catalog_version: Optional[str] = Field(default=None, description="capability 枚举版本（可选）")
 
     model_config = {
         "json_schema_extra": {
@@ -104,11 +107,14 @@ async def create_plan(request: CreatePlanRequest) -> ProjectPlan:
     planner = get_planner()
 
     try:
-        plan = planner.plan(
+        plan = await planner.plan(
             requirement=request.requirement,
             llm_config=request.llm_config,
             project_name=request.project_name,
             app_id=request.app_id,
+            allowed_capabilities=request.allowed_capabilities,
+            capability_catalog_version=request.capability_catalog_version,
+            task_id=request.task_id,
         )
 
         # 如果指定了保存路径，保存规划文件
@@ -154,10 +160,14 @@ async def analyze_requirement(request: CreatePlanRequest) -> Dict[str, Any]:
 
     try:
         # 获取完整规划
-        plan = planner.plan(
+        plan = await planner.plan(
             requirement=request.requirement,
             llm_config=request.llm_config,
             project_name=request.project_name,
+            app_id=request.app_id,
+            allowed_capabilities=request.allowed_capabilities,
+            capability_catalog_version=request.capability_catalog_version,
+            task_id=request.task_id,
         )
 
         # 返回简化的分析结果

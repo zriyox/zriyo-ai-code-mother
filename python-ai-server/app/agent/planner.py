@@ -3,16 +3,20 @@
 只做文件规划，不涉及具体代码实现
 """
 
+import asyncio
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 from loguru import logger
 
+from app.agent.base_agent import CancelableAgent
+from app.agent.services import CapabilityContextService
 from app.models.plan import ProjectPlan, ProjectInfo, FileInfo, ExecutionStep
 from app.models.llm import LlmConfig, LlmMessage
 from app.llm.client import LlmClient
 from app.prompts.planner_prompts import build_planner_prompts
+from app.tools.project import get_generator
 
 
 FIXED_TECH_STACK = {
@@ -39,7 +43,7 @@ REQUIRED_STYLE_FILES = [
 ]
 
 
-class PlannerAgent:
+class PlannerAgent(CancelableAgent):
     """规划 Agent - 使用 LLM 分析需求，生成文件结构规划"""
 
     def __init__(self, scaffold_path: str):
@@ -50,13 +54,18 @@ class PlannerAgent:
             scaffold_path: 前端脚手架路径（用于获取目录结构参考）
         """
         self.scaffold_path = Path(scaffold_path)
+        self.generator = get_generator()
+        self.capability_context_service = CapabilityContextService(self.generator)
 
-    def plan(
+    async def plan(
         self,
         requirement: str,
         llm_config: LlmConfig,
         project_name: str = "ai-generated-app",
         app_id: Optional[int] = None,
+        allowed_capabilities: Optional[List[str]] = None,
+        capability_catalog_version: Optional[str] = None,
+        task_id: Optional[str] = None,
     ) -> ProjectPlan:
         """
         使用 LLM 分析需求，生成项目文件规划
@@ -74,19 +83,31 @@ class PlannerAgent:
         logger.info(f"Requirement: {requirement}")
         logger.info(f"LLM: {llm_config.provider}/{llm_config.model}")
 
-        # 构建 LLM 消息（不包含 Skill 文档）
-        messages = self._build_messages(requirement, project_name)
+        try:
+            await self._check_cancelled(task_id)
 
-        # 调用 LLM
-        client = LlmClient(llm_config)
-        response = client.call(
-            messages,
-            temperature=0.3,
-            max_tokens=4000,
-        )
+            capability_context = await self._load_capability_context(
+                requirement=requirement,
+                project_name=project_name,
+                llm_config=llm_config,
+                allowed_capabilities=allowed_capabilities,
+                capability_catalog_version=capability_catalog_version,
+            )
 
-        # 解析响应
-        plan = self._parse_response(response, requirement, project_name)
+            messages = self._build_messages(requirement, project_name, capability_context=capability_context)
+
+            client = LlmClient(llm_config)
+            response = await asyncio.to_thread(
+                client.call,
+                messages,
+                temperature=0.3,
+                max_tokens=4000,
+            )
+
+            await self._check_cancelled(task_id)
+            plan = await asyncio.to_thread(self._parse_response, response, requirement, project_name)
+        finally:
+            await self._clear_cancel_flag(task_id)
 
         logger.info(f"Plan created: {plan.plan_id}")
         logger.info(f"  Files: {len(plan.files)}, Complexity: {plan.estimated_complexity}")
@@ -97,16 +118,43 @@ class PlannerAgent:
         self,
         requirement: str,
         project_name: str,
+        capability_context: Optional[Dict[str, str]] = None,
     ) -> List[LlmMessage]:
         """构建发送给 LLM 的消息"""
 
         tech_stack_lines = "\n".join([f"- **{k}**: {v}" for k, v in FIXED_TECH_STACK.items()])
         system_prompt, user_prompt = build_planner_prompts(requirement, tech_stack_lines)
+        if capability_context:
+            capability_blocks = []
+            for name, content in capability_context.items():
+                capability_blocks.append(f"### {name}\n{content}")
+            system_prompt += "\n\n## Capability Context\n" + "\n\n".join(capability_blocks)
 
         return [
             LlmMessage(role="system", content=system_prompt),
             LlmMessage(role="user", content=user_prompt),
         ]
+
+    async def _load_capability_context(
+        self,
+        requirement: str,
+        project_name: str,
+        llm_config: LlmConfig,
+        allowed_capabilities: Optional[List[str]],
+        capability_catalog_version: Optional[str],
+    ) -> Dict[str, str]:
+        """
+        为 Planner 选择并加载能力上下文（支持 code/* + mcp/*）。
+        """
+        capability_result = await self.capability_context_service.build_context_for_requirement(
+            requirement=requirement,
+            context=f"planner project_name: {project_name}",
+            llm_config=llm_config,
+            allowed_capabilities=allowed_capabilities,
+            capability_catalog_version=capability_catalog_version,
+            max_capabilities=3,
+        )
+        return capability_result.skills_context
 
     def _parse_response(
         self,

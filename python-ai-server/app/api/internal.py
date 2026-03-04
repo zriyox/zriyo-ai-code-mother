@@ -528,7 +528,7 @@ async def cancel_task(request: TaskCancelRequest) -> TaskCancelResponse:
     输入：Pydantic 模型或 query 参数；输出：JSON 或流式响应。
     说明：包含异步/流式处理逻辑，需关注事件边界与错误兜底。
     """
-    from app.utils.cancel import CancelRegistry
+    from app.utils.cancel import CancelService
 
-    CancelRegistry.request_cancel(request.task_id)
+    await CancelService.request_cancel(request.task_id)
     return TaskCancelResponse(task_id=request.task_id, cancelled=True)

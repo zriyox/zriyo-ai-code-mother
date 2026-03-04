@@ -1,15 +1,20 @@
 """
-前端项目生成 API（Controller 层）。
+项目代码生成 API（Controller 层）。
 
 给 Java 同学：
 - 这里基本等价于 Spring MVC Controller
 - Pydantic `BaseModel` 可类比 Java DTO（带参数校验）
+
+说明：
+- 项目初始化（复制模板 + 依赖软链）已迁移到 Java 侧
+- Python 侧仅保留规划/代码生成/文件读写能力
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Response
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi import APIRouter, HTTPException, Response, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
+import asyncio
 
 from app.tools.project import get_generator
 from app.agent.code_agent import CodeAgent
@@ -25,30 +30,6 @@ router = APIRouter(prefix="/api/v1/project", tags=["project"])
 
 # ==================== 请求模型 ====================
 
-class GenerateProjectRequest(BaseModel):
-    """
-    GenerateProjectRequest 请求 DTO：定义接口入参结构与校验约束。
-    Java 对照：可类比 Controller 入参对象（Request DTO）。
-    """
-    app_id: int = Field(..., description="应用 ID", ge=1)
-    requirement: Optional[str] = Field(default=None, description="用户需求描述（初始化阶段可不传）")
-    project_name: str = Field(default="ai-generated-app", description="项目名称")
-    auto_generate: bool = Field(default=False, description="预留字段，当前初始化阶段不使用")
-
-    model_config = {
-        "json_schema_extra": {
-            "examples": [
-                {
-                    "app_id": 1,
-                    "requirement": "做一个带折线图的数据管理后台，包含登录页面和仪表盘",
-                    "project_name": "data-dashboard",
-                    "auto_generate": False
-                }
-            ]
-        }
-    }
-
-
 class GenerateCodeRequest(BaseModel):
     """
     GenerateCodeRequest 请求 DTO：定义接口入参结构与校验约束。
@@ -58,6 +39,8 @@ class GenerateCodeRequest(BaseModel):
     file_path: str = Field(..., description="要生成的文件路径，如 src/views/Dashboard.vue")
     requirement: str = Field(..., description="代码需求描述")
     llm_config: LlmConfig = Field(..., description="LLM 配置")
+    allowed_capabilities: Optional[List[str]] = Field(default=None, description="编排侧下发的 capability 白名单（可选）")
+    capability_catalog_version: Optional[str] = Field(default=None, description="capability 枚举版本（可选）")
 
 
 class GenerateAndWriteRequest(BaseModel):
@@ -71,6 +54,8 @@ class GenerateAndWriteRequest(BaseModel):
     requirement: str = Field(..., description="代码需求描述")
     llm_config: LlmConfig = Field(..., description="LLM 配置")
     plan_summary: Optional[str] = Field(default=None, description="规划摘要（可选）")
+    allowed_capabilities: Optional[List[str]] = Field(default=None, description="编排侧下发的 capability 白名单（可选）")
+    capability_catalog_version: Optional[str] = Field(default=None, description="capability 枚举版本（可选）")
     # dependencies/file_list 都是“上下文候选文件”，用于让模型参考已有代码风格
     dependencies: Optional[List[str]] = Field(default=None, description="依赖文件路径列表（可选）")
     file_list: Optional[List[str]] = Field(default=None, description="可读文件列表（可选）")
@@ -88,16 +73,6 @@ class WriteCodeRequest(BaseModel):
 
 # ==================== 响应模型 ====================
 
-class GenerateProjectResponse(BaseModel):
-    """
-    GenerateProjectResponse 响应 DTO：定义接口出参结构。
-    Java 对照：可类比 Controller 返回对象（Response DTO）。
-    """
-    success: bool
-    project_path: Optional[str] = None
-    error: Optional[str] = None
-
-
 class FileWriteResponse(BaseModel):
     """
     FileWriteResponse 响应 DTO：定义接口出参结构。
@@ -108,50 +83,7 @@ class FileWriteResponse(BaseModel):
     error: Optional[str] = None
 
 
-class GenerateAndWriteResponse(BaseModel):
-    """
-    GenerateAndWriteResponse 响应 DTO：定义接口出参结构。
-    Java 对照：可类比 Controller 返回对象（Response DTO）。
-    """
-    file_path: str
-    code: str
-    skills_used: List[str]
-    read_files: List[str]
-
-
 # ==================== API 端点 ====================
-
-@router.post(
-    "/generate",
-    response_model=GenerateProjectResponse,
-    summary="生成前端项目",
-    description="""
-初始化前端项目脚手架，包括：
-1. 复制模板文件
-2. 创建 node_modules 软链接
-
-**注意：** 该接口只做确定性初始化，不调用 LLM、不生成代码计划。
-"""
-)
-async def generate_project(request: GenerateProjectRequest) -> GenerateProjectResponse:
-    """
-    路由处理函数：接收请求参数并调用下游能力。
-    输入：Pydantic 模型或 query 参数；输出：JSON 或流式响应。
-    说明：包含异步/流式处理逻辑，需关注事件边界与错误兜底。
-    """
-    generator = get_generator()
-
-    result = generator.generate(
-        app_id=request.app_id,
-        requirement=request.requirement,
-        project_name=request.project_name,
-    )
-
-    if result["success"]:
-        return GenerateProjectResponse(**result)
-    else:
-        raise HTTPException(status_code=500, detail=result)
-
 
 @router.post(
     "/code/generate",
@@ -174,10 +106,13 @@ async def generate_code(request: GenerateCodeRequest) -> Dict[str, Any]:
     generator = get_generator()
 
     # 读取相关 Skill 文档
-    skills_context = generator._load_skills_context(
+    skills_context = await asyncio.to_thread(
+        generator._load_skills_context,
         request.requirement,
-        llm_config=request.llm_config,
-        context=f"file_path: {request.file_path}",
+        request.llm_config,
+        f"file_path: {request.file_path}",
+        request.allowed_capabilities,
+        request.capability_catalog_version,
     )
 
     # 构建系统提示词
@@ -196,7 +131,6 @@ async def generate_code(request: GenerateCodeRequest) -> Dict[str, Any]:
 @router.post(
     "/code/generate-and-write",
     responses={
-        200: {"description": "生成并写入完成（非流式）", "model": GenerateAndWriteResponse},
         202: {"description": "生成中（SSE 流式）"},
     },
     summary="生成并写入代码",
@@ -206,71 +140,57 @@ async def generate_code(request: GenerateCodeRequest) -> Dict[str, Any]:
 )
 async def generate_and_write_code(
     request: GenerateAndWriteRequest,
-    stream: bool = True,
+    http_request: Request,
 ) -> Response:
     """
-    生成并写入代码（支持 SSE）。
-
-    - `stream=true`：返回 `text/event-stream`，边生成边推送
-    - `stream=false`：等待完成后一次性返回 JSON
+    生成并写入代码（仅支持 SSE 流式）。
     """
     agent = CodeAgent()
-    trace_id = uuid.uuid4().hex
+    trace_id = getattr(http_request.state, "trace_id", None) or uuid.uuid4().hex
 
-    if stream:
-        async def event_stream():
-            # 这里把 Agent 的事件透传出去；如果中途报错，补一个 failed 完成事件
-            try:
-                async for event in agent.generate_and_write_stream(
-                    app_id=request.app_id,
-                    file_path=request.file_path,
-                    requirement=request.requirement,
-                    llm_config=request.llm_config,
-                    plan_summary=request.plan_summary,
-                    dependencies=request.dependencies,
-                    file_list=request.file_list,
-                    task_id=request.task_id,
-                    trace_id=trace_id,
-                ):
-                    yield event
-            except Exception as e:
-                error_event = SseEvent(
-                    trace_id=trace_id,
-                    event_type=SseEventType.ERROR,
-                    timestamp=int(time.time() * 1000),
-                    data={"error": str(e)},
-                )
-                complete_event = SseEvent(
-                    trace_id=trace_id,
-                    event_type=SseEventType.REQUEST_COMPLETE,
-                    timestamp=int(time.time() * 1000),
-                    data={"status": "failed", "file_path": request.file_path},
-                )
-                yield error_event
-                yield complete_event
+    async def event_stream():
+        # 这里把 Agent 的事件透传出去；如果中途报错，补一个 failed 完成事件
+        try:
+            async for event in agent.generate_and_write_stream(
+                app_id=request.app_id,
+                file_path=request.file_path,
+                requirement=request.requirement,
+                llm_config=request.llm_config,
+                plan_summary=request.plan_summary,
+                dependencies=request.dependencies,
+                file_list=request.file_list,
+                allowed_capabilities=request.allowed_capabilities,
+                capability_catalog_version=request.capability_catalog_version,
+                task_id=request.task_id,
+                trace_id=trace_id,
+            ):
+                yield event
+        except Exception as e:
+            error_event = SseEvent(
+                trace_id=trace_id,
+                event_type=SseEventType.ERROR,
+                timestamp=int(time.time() * 1000),
+                data={"error": str(e)},
+            )
+            complete_event = SseEvent(
+                trace_id=trace_id,
+                event_type=SseEventType.REQUEST_COMPLETE,
+                timestamp=int(time.time() * 1000),
+                data={"status": "failed", "file_path": request.file_path},
+            )
+            yield error_event
+            yield complete_event
 
-        return StreamingResponse(
-            sse_stream(event_stream()),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",
-            },
-            status_code=202,
-        )
-
-    result = await agent.generate_and_write(
-        app_id=request.app_id,
-        file_path=request.file_path,
-        requirement=request.requirement,
-        llm_config=request.llm_config,
-        plan_summary=request.plan_summary,
-        dependencies=request.dependencies,
-        file_list=request.file_list,
-        task_id=request.task_id,
+    return StreamingResponse(
+        sse_stream(event_stream()),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+        status_code=202,
     )
-    return JSONResponse(content=GenerateAndWriteResponse(**result).model_dump())
 
 
 @router.post(

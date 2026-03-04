@@ -14,9 +14,9 @@ public enum StepStatus {
     PENDING("pending", "等待中"),
 
     /**
-     * 运行中
+     * 进行中
      */
-    RUNNING("running", "运行中"),
+    IN_PROGRESS("in_progress", "进行中"),
 
     /**
      * 已完成
@@ -52,5 +52,21 @@ public enum StepStatus {
 
     public String getDescription() {
         return description;
+    }
+
+    public static StepStatus fromCode(String code) {
+        if (code == null || code.isBlank()) {
+            return PENDING;
+        }
+        String normalized = code.trim().toLowerCase();
+        if ("running".equals(normalized)) {
+            return IN_PROGRESS;
+        }
+        for (StepStatus status : values()) {
+            if (status.code.equals(normalized)) {
+                return status;
+            }
+        }
+        return PENDING;
     }
 }

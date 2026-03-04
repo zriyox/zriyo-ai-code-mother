@@ -9,29 +9,44 @@ package com.zriyo.common.enums;
 public enum ExecutionStage {
 
     /**
-     * 初始化
+     * 准备阶段
      */
-    INITIALIZING("initializing", "初始化"),
+    PREPARE("prepare", "准备阶段"),
 
     /**
-     * 意图识别
+     * 初始化脚手架
      */
-    INTENT_RECOGNITION("intent_recognition", "意图识别"),
+    INIT_SCAFFOLD("init_scaffold", "初始化脚手架"),
 
     /**
-     * 规划中
+     * 规划
      */
-    PLANNING("planning", "规划中"),
+    PLAN("plan", "规划"),
 
     /**
-     * 执行中
+     * 代码生成
      */
-    EXECUTING("executing", "执行中"),
+    CODEGEN("codegen", "代码生成"),
 
     /**
-     * 验证中
+     * 检查
      */
-    VALIDATING("validating", "验证中"),
+    CHECK("check", "检查"),
+
+    /**
+     * 预览
+     */
+    PREVIEW("preview", "预览"),
+
+    /**
+     * 修复
+     */
+    REPAIR("repair", "修复"),
+
+    /**
+     * 收尾
+     */
+    FINALIZE("finalize", "收尾"),
 
     /**
      * 完成
@@ -62,5 +77,31 @@ public enum ExecutionStage {
 
     public String getDescription() {
         return description;
+    }
+
+    public static ExecutionStage fromCode(String code) {
+        if (code == null || code.isBlank()) {
+            return PREPARE;
+        }
+        String normalized = code.trim().toLowerCase();
+        // 兼容旧值
+        if ("initializing".equals(normalized)) {
+            return PREPARE;
+        }
+        if ("planning".equals(normalized) || "intent_recognition".equals(normalized)) {
+            return PLAN;
+        }
+        if ("executing".equals(normalized)) {
+            return CODEGEN;
+        }
+        if ("validating".equals(normalized)) {
+            return CHECK;
+        }
+        for (ExecutionStage stage : values()) {
+            if (stage.code.equals(normalized)) {
+                return stage;
+            }
+        }
+        return PREPARE;
     }
 }

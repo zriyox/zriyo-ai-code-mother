@@ -15,7 +15,9 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.HttpStatusCodeException;
+import org.slf4j.MDC;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -74,6 +76,7 @@ public class PythonServiceClient {
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
+            propagateTraceHeaders(headers);
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, headers);
 
@@ -90,6 +93,41 @@ public class PythonServiceClient {
             return -1;
         } catch (Exception e) {
             log.error("调用 Python token 计数失败: {}", e.getMessage());
+            return -1;
+        }
+    }
+
+    /**
+     * 计算消息列表的 token 数量（考虑对话开销）
+     */
+    public int countMessages(String provider, List<Map<String, String>> messages, String model) {
+        try {
+            Map<String, Object> request = new HashMap<>();
+            request.put("provider", provider);
+            request.put("messages", messages);
+            if (StringUtils.hasText(model)) {
+                request.put("model", model);
+            }
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            propagateTraceHeaders(headers);
+
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, headers);
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> response = restTemplate.postForObject(
+                    getBaseUrl() + "/api/internal/count-messages",
+                    entity,
+                    Map.class
+            );
+
+            if (response != null) {
+                return (Integer) response.get("token_count");
+            }
+            return -1;
+        } catch (Exception e) {
+            log.error("调用 Python message token 计数失败: {}", e.getMessage());
             return -1;
         }
     }
@@ -133,6 +171,7 @@ public class PythonServiceClient {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        propagateTraceHeaders(headers);
 
         HttpEntity<Object> entity = new HttpEntity<>(body, headers);
 
@@ -153,6 +192,24 @@ public class PythonServiceClient {
         } catch (RestClientException e) {
             log.error("调用 Python 服务失败: {}", e.getMessage());
             throw new BusinessException(ErrorCode.PYTHON_SERVICE_ERROR, e.getMessage());
+        }
+    }
+
+    /**
+     * 透传链路追踪头，确保 Java -> Python trace 连续。
+     */
+    private void propagateTraceHeaders(HttpHeaders headers) {
+        String traceId = MDC.get("traceId");
+        if (StringUtils.hasText(traceId)) {
+            headers.set("X-Trace-Id", traceId);
+        }
+        String requestId = MDC.get("requestId");
+        if (StringUtils.hasText(requestId)) {
+            headers.set("X-Request-Id", requestId);
+        }
+        String taskId = MDC.get("taskId");
+        if (StringUtils.hasText(taskId)) {
+            headers.set("X-Task-Id", taskId);
         }
     }
 }
